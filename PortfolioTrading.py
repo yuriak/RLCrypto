@@ -13,7 +13,7 @@ MODEL_PATH = './PG_Portfolio'
 asset_symbols = []
 
 
-def select_coins(method='CAPM', risky_number=2, risk_free_number=2):
+def select_coins(method='CAPM', risky_number=0, risk_free_number=2):
     symbols = lmap(lambda x: x['base-currency'], lfilter(lambda x: x['quote-currency'] == 'btc', get_symbols()['data']))
     print('fetching data')
     asset_data = lfilter(lambda x: x[1] is not None, lmap(lambda x: (x, kline(x, interval='15min', count=2000)), symbols))
@@ -28,7 +28,11 @@ def select_coins(method='CAPM', risky_number=2, risk_free_number=2):
         low_risk = capm[(capm['alpha'] > 0) & (capm['beta'] < 1)].sort_values('alpha')
         print(len(high_risk), 'risky candidates')
         print(len(low_risk), 'risk-free candidates')
-        candidate = list(high_risk[-risky_number:].index) + list(low_risk[-risk_free_number:].index)
+        candidate = []
+        if risky_number > 0:
+            candidate.extend(list(high_risk[-risky_number:].index))
+        if risk_free_number > 0:
+            candidate.extend(list(low_risk[-risk_free_number:].index))
         print(len(candidate))
         return candidate
     else:
@@ -119,7 +123,7 @@ def real_trade(asset_data, assets, normalize_length=10, debug=True, model_path='
                 result = order_percent(a, symbol=k + 'btc', asset=k, order_type='limit', debug=debug, amount_discount=0.1)
                 print(result)
             else:
-                result = order_percent(a, symbol=k + 'btc', asset=k, order_type='market', debug=debug, amount_discount=0.1)
+                result = order_percent(a, symbol=k + 'btc', asset=k, order_type='limit', debug=debug, amount_discount=0.1)
                 print(result)
 
 
