@@ -12,18 +12,19 @@ CONFIG_FILE = 'portfolio_config.json'
 MODEL_PATH = './PG_Portfolio1'
 
 # portfolio selection
-TICK_INTERVAL = '30min'
+TRADING_TICK_INTERVAL = '30min'
+PORTFOLIO_SELECTION_TICK_INTERVAL = '5min'
 BAR_COUNT = 2000
-RISK_ASSET_NUMBER = 0
-RISK_FREE_ASSET_NUMBER = 2
+RISK_ASSET_NUMBER = 1
+RISK_FREE_ASSET_NUMBER = 1
 asset_symbols = []
 
 # pre-processing parameters
 MAX_PRE_PROCESSING_WINDOW = 10
 
 # training hyper-parameters
-REWARD_THRESHOLD = 1.0
-FEE = 1e-4
+REWARD_THRESHOLD = 0.5
+FEE = 1e-5
 NORMALIZE_LENGTH = 10
 # total training length is BATCH_NUMBER*BATCH_SIZE
 BATCH_SIZE = 50
@@ -38,16 +39,19 @@ TEST_LENGTH = 1000
 AMOUNT_DISCOUNT = 0.1
 DEBUG_MODE = True
 BUY_ORDER_TYPE = 'limit'
-SELL_ORDER_TYPE = 'limit'
+SELL_ORDER_TYPE = 'market'
 
 
 def select_coins(method='CAPM', risky_number=RISK_ASSET_NUMBER, risk_free_number=RISK_FREE_ASSET_NUMBER):
-    symbols = lmap(lambda x: x['base-currency'], lfilter(lambda x: x['quote-currency'] == 'btc', get_symbols()['data']))
+    symbols = lmap(lambda x: x['base-currency'], lfilter(lambda x: x['symbol-partition']=='innovation' and x['quote-currency'] == 'btc', get_symbols()['data']))
     print('fetching data')
-    asset_data = lfilter(lambda x: x[1] is not None, lmap(lambda x: (x, kline(x, interval=TICK_INTERVAL, count=BAR_COUNT)), symbols))
+    asset_data = klines(symbols, interval=PORTFOLIO_SELECTION_TICK_INTERVAL, count=BAR_COUNT)
     print('building data')
-    asset_data = pd.Panel(dict(asset_data))
+    asset_data = OrderedDict(asset_data)
+    asset_data = pd.Panel(asset_data)
     print(asset_data.shape)
+    asset_data = asset_data.dropna(axis=1)
+    asset_data.to_pickle('all_assets')
     market_index = asset_data[:, :, 'diff'].mean(axis=1)
     if method == 'CAPM':
         print('applying CAPM')
@@ -62,6 +66,7 @@ def select_coins(method='CAPM', risky_number=RISK_ASSET_NUMBER, risk_free_number
         if risk_free_number > 0:
             candidate.extend(list(low_risk[-risk_free_number:].index))
         print(len(candidate))
+        print(candidate)
         return candidate
     else:
         # not implemented
@@ -79,8 +84,8 @@ def create_new_model(asset_data, c=FEE, normalize_length=NORMALIZE_LENGTH, batch
             test_reward = []
             test_actions = []
             train_reward = []
+            previous_action = np.zeros(asset_data.shape[0] + 1)
             for b in range(batch_number):
-                previous_action = np.zeros(asset_data.shape[0] + 1)
                 for t in range(b * batch_size + normalize_length, (b + 1) * batch_size + normalize_length):
                     state = asset_data[:, t - normalize_length:t, :].values
                     state = state.reshape((state.shape[1], state.shape[0] * state.shape[2]))
@@ -90,7 +95,7 @@ def create_new_model(asset_data, c=FEE, normalize_length=NORMALIZE_LENGTH, batch
                     model.save_transation(a=action, s=state[0], r=r)
                     previous_action = action
                     train_reward.append(r)
-                loss = model.train(drop=0.85)
+                loss = model.train(drop=1.0)
                 model.restore_buffer()
             model.restore_buffer()
             print(e, 'train_reward', np.sum(train_reward))
@@ -179,7 +184,7 @@ if __name__ == '__main__':
             print('deleting duplicated model...')
         with open(CONFIG_FILE, 'r+') as cf:
             asset_symbols = json.loads(cf.read())
-        asset_data = klines(asset_symbols, interval=TICK_INTERVAL, count=BAR_COUNT)
+        asset_data = klines(asset_symbols, interval=TRADING_TICK_INTERVAL, count=BAR_COUNT)
         asset_data = pre_process(asset_data, max_time_window=MAX_PRE_PROCESSING_WINDOW)
         print('start to create new model')
         create_new_model(asset_data=asset_data, model_path=MODEL_PATH)
@@ -192,7 +197,7 @@ if __name__ == '__main__':
             sys.exit(1)
         with open(CONFIG_FILE, 'r+') as cf:
             asset_symbols = json.loads(cf.read())
-        asset_data = klines(asset_symbols, interval=TICK_INTERVAL, count=BAR_COUNT)
+        asset_data = klines(asset_symbols, interval=TRADING_TICK_INTERVAL, count=BAR_COUNT)
         asset_data = pre_process(asset_data, max_time_window=MAX_PRE_PROCESSING_WINDOW)
         # warning!!! set debug=False will lose all your money @_@
         real_trade(asset_data=asset_data, assets=asset_symbols, model_path=MODEL_PATH, log_path=LOG_FILE, debug=DEBUG_MODE)
@@ -217,7 +222,7 @@ if __name__ == '__main__':
             print('deleting duplicated model...')
         with open(CONFIG_FILE, 'r+') as cf:
             asset_symbols = json.loads(cf.read())
-        asset_data = klines(asset_symbols, interval=TICK_INTERVAL, count=BAR_COUNT)
+        asset_data = klines(asset_symbols, interval=TRADING_TICK_INTERVAL, count=BAR_COUNT)
         asset_data = pre_process(asset_data, max_time_window=MAX_PRE_PROCESSING_WINDOW)
         print('start to create new model')
         create_new_model(asset_data=asset_data, model_path=MODEL_PATH)

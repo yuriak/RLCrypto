@@ -2,6 +2,7 @@
 from HuobiServices import *
 import numpy as np
 import pandas as pd
+import time
 
 lmap = lambda func, it: list(map(lambda x: func(x), it))
 lfilter = lambda func, it: list(filter(lambda x: func(x), it))
@@ -17,11 +18,13 @@ def kline(asset, interval='15min', count=500):
     s.index = pd.DatetimeIndex(s['id'].apply(lambda x: datetime.datetime.utcfromtimestamp(x) + datetime.timedelta(hours=8)))
     s = s.drop('id', axis=1)
     s['avg'] = (np.mean(s[['open', 'high', 'low', 'close']], axis=1))
-    s['diff'] = np.log(s['avg'] / s['avg'].shift(1)).fillna(0)
+    s['diff'] = np.log(s['close'] / s['close'].shift(1)).fillna(0)
     return s
 
-def klines(assets,interval='15min',count=500):
+
+def klines(assets, interval='15min', count=500):
     return lfilter(lambda x: x[1] is not None, lmap(lambda x: (x, kline(x, interval=interval, count=count)), assets))
+
 
 def order_percent(target_percent, symbol='kanbtc', asset='kan', order_type='limit', price_discount=0, amount_discount=0.05, debug=True):
     balance = get_balance()
@@ -36,11 +39,13 @@ def order_percent(target_percent, symbol='kanbtc', asset='kan', order_type='limi
     market_price = round(ticker['close'], price_precision)
     limit_buy_price = round(float(ticker['bid'][0]) * (1 - price_discount), price_precision)
     limit_sell_price = round(float(ticker['ask'][0]) * (1 + price_discount), price_precision)
-    
+    print('current order info', current_order_info)
     if len(current_order_info) > 0:
         for order in current_order_info:
             order_id = order['id']
-            cancel_order(order_id=order_id)
+            print('cancel previous order:',order)
+            print(cancel_order(order_id=order_id))
+            
     
     max_buy_amount = 0
     max_sell_amount = 0
@@ -94,10 +99,12 @@ def order_percent(target_percent, symbol='kanbtc', asset='kan', order_type='limi
             if order_type == 'limit':
                 order = send_order(symbol=symbol, source='api', amount=target_sell_amount, _type='sell-limit', price=limit_sell_price)
                 print(order)
+                time.sleep(10)
                 return order['data']
             else:
                 order = send_order(symbol=symbol, source='api', amount=target_sell_amount, _type='sell-market')
                 print(order)
+                time.sleep(10)
                 return order['data']
         else:
             print('debugging')
