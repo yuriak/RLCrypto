@@ -14,7 +14,7 @@ MODEL_PATH = './PG_Portfolio1'
 # portfolio selection
 TRADING_TICK_INTERVAL = '30min'
 PORTFOLIO_SELECTION_TICK_INTERVAL = '5min'
-PORTFOLIO_SELECTION_BAR_COUNT=500
+PORTFOLIO_SELECTION_BAR_COUNT = 500
 BAR_COUNT = 2000
 RISK_ASSET_NUMBER = 0
 RISK_FREE_ASSET_NUMBER = 2
@@ -38,13 +38,14 @@ TEST_LENGTH = 1000
 
 # trading hyper-parameters
 AMOUNT_DISCOUNT = 0.1
+PRICE_DISCOUNT = -1e-4
 DEBUG_MODE = True
 BUY_ORDER_TYPE = 'limit'
 SELL_ORDER_TYPE = 'market'
 
 
 def select_coins(method='CAPM', risky_number=RISK_ASSET_NUMBER, risk_free_number=RISK_FREE_ASSET_NUMBER):
-    symbols = lmap(lambda x: x['base-currency'], lfilter(lambda x: x['symbol-partition']=='innovation' and x['quote-currency'] == 'btc', get_symbols()['data']))
+    symbols = lmap(lambda x: x['base-currency'], lfilter(lambda x: x['symbol-partition'] == 'innovation' and x['quote-currency'] == 'btc', get_symbols()['data']))
     print('fetching data')
     asset_data = klines(symbols, interval=PORTFOLIO_SELECTION_TICK_INTERVAL, count=PORTFOLIO_SELECTION_BAR_COUNT)
     print('building data')
@@ -154,10 +155,10 @@ def real_trade(asset_data, assets, normalize_length=NORMALIZE_LENGTH, debug=DEBU
         for k, a in action:
             print('sending order for asset', k)
             if a > 0:
-                result = order_percent(a, symbol=k + 'btc', asset=k, order_type=BUY_ORDER_TYPE, debug=debug, amount_discount=AMOUNT_DISCOUNT)
+                result = order_percent(a, symbol=k + 'btc', asset=k, order_type=BUY_ORDER_TYPE, debug=debug, price_discount=PRICE_DISCOUNT, amount_discount=AMOUNT_DISCOUNT)
                 print(result)
             else:
-                result = order_percent(a, symbol=k + 'btc', asset=k, order_type=SELL_ORDER_TYPE, debug=debug, amount_discount=AMOUNT_DISCOUNT)
+                result = order_percent(a, symbol=k + 'btc', asset=k, order_type=SELL_ORDER_TYPE, debug=debug, price_discount=PRICE_DISCOUNT, amount_discount=AMOUNT_DISCOUNT)
                 print(result)
 
 
@@ -190,6 +191,7 @@ if __name__ == '__main__':
         print('start to create new model')
         create_new_model(asset_data=asset_data, model_path=MODEL_PATH)
     elif mode == 'trade':
+        print('=' * 128)
         if not os.path.exists(CONFIG_FILE):
             print('config file not exist, please select coins first')
             sys.exit(1)

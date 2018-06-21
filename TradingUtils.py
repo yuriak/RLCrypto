@@ -27,18 +27,16 @@ def klines(assets, interval='15min', count=500):
 
 
 def order_percent(target_percent, symbol='kanbtc', asset='kan', order_type='limit', price_discount=0, amount_discount=0.05, debug=True):
-    
     current_order_info = orders_list(symbol=symbol, states='submitted')['data']
     print('current order info', current_order_info)
     if len(current_order_info) > 0:
         for order in current_order_info:
             order_id = order['id']
             print('cancel previous order:', order)
-            print(cancel_order(order_id=order_id))
+            cancel_order(order_id=order_id)
     
     balance = get_balance()
     asset_info = lfilter(lambda x: x['base-currency'] == asset and x['quote-currency'] == 'btc', get_symbols()['data'])
-    
     
     amount_precision = asset_info[0]['amount-precision']
     price_precision = asset_info[0]['price-precision']
@@ -48,8 +46,6 @@ def order_percent(target_percent, symbol='kanbtc', asset='kan', order_type='limi
     market_price = round(ticker['close'], price_precision)
     limit_buy_price = round(float(ticker['bid'][0]) * (1 - price_discount), price_precision)
     limit_sell_price = round(float(ticker['ask'][0]) * (1 + price_discount), price_precision)
-    
-            
     
     max_buy_amount = 0
     max_sell_amount = 0
