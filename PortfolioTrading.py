@@ -11,12 +11,14 @@ LOG_FILE = 'portfolio_log.csv'
 CONFIG_FILE = 'portfolio_config.json'
 MODEL_PATH = './PG_Portfolio'
 asset_symbols = []
+data_frequency = '15min'
+bar_count = 2000
 
 
 def select_coins(method='CAPM', risky_number=0, risk_free_number=2):
     symbols = lmap(lambda x: x['base-currency'], lfilter(lambda x: x['quote-currency'] == 'btc', get_symbols()['data']))
     print('fetching data')
-    asset_data = lfilter(lambda x: x[1] is not None, lmap(lambda x: (x, kline(x, interval='15min', count=2000)), symbols))
+    asset_data = lfilter(lambda x: x[1] is not None, lmap(lambda x: (x, kline(x, interval=data_frequency, count=bar_count)), symbols))
     print('building data')
     asset_data = pd.Panel(dict(asset_data))
     print(asset_data.shape)
@@ -62,7 +64,7 @@ def create_new_model(asset_data, c=0, normalize_length=10, train_length=50, batc
                     model.save_transation(a=action, s=state[0], r=r)
                     previous_action = action
                     train_reward.append(r)
-                loss = model.train(drop=1.0)
+                loss = model.train(drop=0.85)
                 model.restore_buffer()
             model.restore_buffer()
             print(e, 'train_reward', np.sum(train_reward))
@@ -151,7 +153,7 @@ if __name__ == '__main__':
             print('deleting duplicated model...')
         with open(CONFIG_FILE, 'r+') as cf:
             asset_symbols = json.loads(cf.read())
-        asset_data = lfilter(lambda x: x[1] is not None, lmap(lambda x: (x, kline(x, interval='15min', count=2000)), asset_symbols))
+        asset_data = lfilter(lambda x: x[1] is not None, lmap(lambda x: (x, kline(x, interval=data_frequency, count=bar_count)), asset_symbols))
         asset_data = lmap(lambda x: (x[0], generate_tech_data(x[1], close_name='close', high_name='high', low_name='low', open_name='open', max_time_window=10)), asset_data)
         asset_data = OrderedDict(asset_data)
         asset_data = pd.Panel(asset_data)
@@ -166,7 +168,7 @@ if __name__ == '__main__':
             sys.exit(1)
         with open(CONFIG_FILE, 'r+') as cf:
             asset_symbols = json.loads(cf.read())
-        asset_data = lfilter(lambda x: x[1] is not None, lmap(lambda x: (x, kline(x, interval='15min', count=2000)), asset_symbols))
+        asset_data = lfilter(lambda x: x[1] is not None, lmap(lambda x: (x, kline(x, interval=data_frequency, count=bar_count)), asset_symbols))
         asset_data = lmap(lambda x: (x[0], generate_tech_data(x[1], close_name='close', high_name='high', low_name='low', open_name='open', max_time_window=10)), asset_data)
         asset_data = OrderedDict(asset_data)
         asset_data = pd.Panel(asset_data)
@@ -193,7 +195,7 @@ if __name__ == '__main__':
             print('deleting duplicated model...')
         with open(CONFIG_FILE, 'r+') as cf:
             asset_symbols = json.loads(cf.read())
-        asset_data = lfilter(lambda x: x[1] is not None, lmap(lambda x: (x, kline(x, interval='15min', count=2000)), asset_symbols))
+        asset_data = lfilter(lambda x: x[1] is not None, lmap(lambda x: (x, kline(x, interval=data_frequency, count=bar_count)), asset_symbols))
         asset_data = lmap(lambda x: (x[0], generate_tech_data(x[1], close_name='close', high_name='high', low_name='low', open_name='open', max_time_window=10)), asset_data)
         asset_data = OrderedDict(asset_data)
         asset_data = pd.Panel(asset_data)
