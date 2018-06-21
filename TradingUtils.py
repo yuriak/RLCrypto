@@ -20,6 +20,8 @@ def kline(asset, interval='15min', count=500):
     s['diff'] = np.log(s['avg'] / s['avg'].shift(1)).fillna(0)
     return s
 
+def klines(assets,interval='15min',count=500):
+    return lfilter(lambda x: x[1] is not None, lmap(lambda x: (x, kline(x, interval=interval, count=count)), assets))
 
 def order_percent(target_percent, symbol='kanbtc', asset='kan', order_type='limit', price_discount=0, amount_discount=0.05, debug=True):
     balance = get_balance()

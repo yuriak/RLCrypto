@@ -9,16 +9,42 @@ import shutil
 
 LOG_FILE = 'portfolio_log.csv'
 CONFIG_FILE = 'portfolio_config.json'
-MODEL_PATH = './PG_Portfolio'
+MODEL_PATH = './PG_Portfolio1'
+
+# portfolio selection
+TICK_INTERVAL = '30min'
+BAR_COUNT = 2000
+RISK_ASSET_NUMBER = 0
+RISK_FREE_ASSET_NUMBER = 2
 asset_symbols = []
-data_frequency = '15min'
-bar_count = 2000
+
+# pre-processing parameters
+MAX_PRE_PROCESSING_WINDOW = 10
+
+# training hyper-parameters
+REWARD_THRESHOLD = 1.0
+FEE = 1e-4
+NORMALIZE_LENGTH = 10
+# total training length is BATCH_NUMBER*BATCH_SIZE
+BATCH_SIZE = 50
+BATCH_NUMBER = 20
+MAX_TRAINING_EPOCH = 30
+LEARNING_RATE = 1e-3
+
+#  testing hyper-parameters
+TEST_LENGTH = 1000
+
+# trading hyper-parameters
+AMOUNT_DISCOUNT = 0.1
+DEBUG_MODE = True
+BUY_ORDER_TYPE = 'limit'
+SELL_ORDER_TYPE = 'limit'
 
 
-def select_coins(method='CAPM', risky_number=0, risk_free_number=2):
+def select_coins(method='CAPM', risky_number=RISK_ASSET_NUMBER, risk_free_number=RISK_FREE_ASSET_NUMBER):
     symbols = lmap(lambda x: x['base-currency'], lfilter(lambda x: x['quote-currency'] == 'btc', get_symbols()['data']))
     print('fetching data')
-    asset_data = lfilter(lambda x: x[1] is not None, lmap(lambda x: (x, kline(x, interval=data_frequency, count=bar_count)), symbols))
+    asset_data = lfilter(lambda x: x[1] is not None, lmap(lambda x: (x, kline(x, interval=TICK_INTERVAL, count=BAR_COUNT)), symbols))
     print('building data')
     asset_data = pd.Panel(dict(asset_data))
     print(asset_data.shape)
@@ -42,7 +68,7 @@ def select_coins(method='CAPM', risky_number=0, risk_free_number=2):
         return []
 
 
-def create_new_model(asset_data, c=0, normalize_length=10, train_length=50, batch_size=20, max_epoch=30, learning_rate=1e-3, pass_threshold=0.6, model_path='./PG_Portfolio'):
+def create_new_model(asset_data, c=FEE, normalize_length=NORMALIZE_LENGTH, batch_size=BATCH_SIZE, batch_number=BATCH_NUMBER, max_epoch=MAX_TRAINING_EPOCH, learning_rate=LEARNING_RATE, pass_threshold=REWARD_THRESHOLD, model_path='./PG_Portfolio'):
     current_model_reward = -np.inf
     model = None
     while current_model_reward < pass_threshold:
@@ -53,9 +79,9 @@ def create_new_model(asset_data, c=0, normalize_length=10, train_length=50, batc
             test_reward = []
             test_actions = []
             train_reward = []
-            for b in range(batch_size):
+            for b in range(batch_number):
                 previous_action = np.zeros(asset_data.shape[0] + 1)
-                for t in range(b * train_length + normalize_length, (b + 1) * train_length + normalize_length):
+                for t in range(b * batch_size + normalize_length, (b + 1) * batch_size + normalize_length):
                     state = asset_data[:, t - normalize_length:t, :].values
                     state = state.reshape((state.shape[1], state.shape[0] * state.shape[2]))
                     state = z_score(state)[None, -1]
@@ -69,7 +95,7 @@ def create_new_model(asset_data, c=0, normalize_length=10, train_length=50, batc
             model.restore_buffer()
             print(e, 'train_reward', np.sum(train_reward))
             previous_action = np.zeros(asset_data.shape[0] + 1)
-            for t in range(train_length * batch_size + normalize_length, asset_data.shape[1]):
+            for t in range(batch_size * batch_number + normalize_length, asset_data.shape[1]):
                 state = asset_data[:, t - normalize_length:t, :].values
                 state = state.reshape((state.shape[1], state.shape[0] * state.shape[2]))
                 state = z_score(state)[None, -1]
@@ -89,7 +115,7 @@ def create_new_model(asset_data, c=0, normalize_length=10, train_length=50, batc
     return model
 
 
-def backtest(asset_data, model, train_length=1000, normalize_length=10, c=0):
+def backtest(asset_data, model, train_length=BATCH_NUMBER * BATCH_SIZE, normalize_length=NORMALIZE_LENGTH, c=FEE):
     previous_action = np.zeros(asset_data.shape[0] + 1)
     test_reward = []
     test_actions = []
@@ -106,7 +132,7 @@ def backtest(asset_data, model, train_length=1000, normalize_length=10, c=0):
     return np.sum(test_reward)
 
 
-def real_trade(asset_data, assets, normalize_length=10, debug=True, model_path='./PG_Portfolio', log_path='portfolio_log.csv'):
+def real_trade(asset_data, assets, normalize_length=NORMALIZE_LENGTH, debug=DEBUG_MODE, model_path='./PG_Portfolio', log_path='portfolio_log.csv'):
     model = PG_Crypto_portfolio(action_size=asset_data.shape[0] + 1, feature_number=asset_data.shape[2] * asset_data.shape[0])
     model.load_model(model_path=model_path)
     backtest(asset_data, model=model)
@@ -122,10 +148,10 @@ def real_trade(asset_data, assets, normalize_length=10, debug=True, model_path='
         for k, a in action:
             print('sending order for asset', k)
             if a > 0:
-                result = order_percent(a, symbol=k + 'btc', asset=k, order_type='limit', debug=debug, amount_discount=0.1)
+                result = order_percent(a, symbol=k + 'btc', asset=k, order_type=BUY_ORDER_TYPE, debug=debug, amount_discount=AMOUNT_DISCOUNT)
                 print(result)
             else:
-                result = order_percent(a, symbol=k + 'btc', asset=k, order_type='limit', debug=debug, amount_discount=0.1)
+                result = order_percent(a, symbol=k + 'btc', asset=k, order_type=SELL_ORDER_TYPE, debug=debug, amount_discount=AMOUNT_DISCOUNT)
                 print(result)
 
 
@@ -135,9 +161,9 @@ if __name__ == '__main__':
         if os.path.exists(CONFIG_FILE):
             asset_symbols = json.loads(open(CONFIG_FILE, 'r+').read())
             for k in asset_symbols:
-                order_percent(0, symbol=k + 'btc', asset=k, order_type='market', amount_discount=0.02, debug=False)
+                order_percent(0, symbol=k + 'btc', asset=k, order_type='market', amount_discount=AMOUNT_DISCOUNT, debug=DEBUG_MODE)
             os.remove(CONFIG_FILE)
-        asset_symbols = select_coins()
+        asset_symbols = select_coins(risky_number=RISK_ASSET_NUMBER, risk_free_number=RISK_FREE_ASSET_NUMBER)
         if len(asset_symbols) == 0:
             print('no appropriate assets')
             sys.exit(1)
@@ -153,10 +179,8 @@ if __name__ == '__main__':
             print('deleting duplicated model...')
         with open(CONFIG_FILE, 'r+') as cf:
             asset_symbols = json.loads(cf.read())
-        asset_data = lfilter(lambda x: x[1] is not None, lmap(lambda x: (x, kline(x, interval=data_frequency, count=bar_count)), asset_symbols))
-        asset_data = lmap(lambda x: (x[0], generate_tech_data(x[1], close_name='close', high_name='high', low_name='low', open_name='open', max_time_window=10)), asset_data)
-        asset_data = OrderedDict(asset_data)
-        asset_data = pd.Panel(asset_data)
+        asset_data = klines(asset_symbols, interval=TICK_INTERVAL, count=BAR_COUNT)
+        asset_data = pre_process(asset_data, max_time_window=MAX_PRE_PROCESSING_WINDOW)
         print('start to create new model')
         create_new_model(asset_data=asset_data, model_path=MODEL_PATH)
     elif mode == 'trade':
@@ -168,17 +192,15 @@ if __name__ == '__main__':
             sys.exit(1)
         with open(CONFIG_FILE, 'r+') as cf:
             asset_symbols = json.loads(cf.read())
-        asset_data = lfilter(lambda x: x[1] is not None, lmap(lambda x: (x, kline(x, interval=data_frequency, count=bar_count)), asset_symbols))
-        asset_data = lmap(lambda x: (x[0], generate_tech_data(x[1], close_name='close', high_name='high', low_name='low', open_name='open', max_time_window=10)), asset_data)
-        asset_data = OrderedDict(asset_data)
-        asset_data = pd.Panel(asset_data)
+        asset_data = klines(asset_symbols, interval=TICK_INTERVAL, count=BAR_COUNT)
+        asset_data = pre_process(asset_data, max_time_window=MAX_PRE_PROCESSING_WINDOW)
         # warning!!! set debug=False will lose all your money @_@
-        real_trade(asset_data=asset_data, assets=asset_symbols, model_path=MODEL_PATH, log_path=LOG_FILE, debug=False)
+        real_trade(asset_data=asset_data, assets=asset_symbols, model_path=MODEL_PATH, log_path=LOG_FILE, debug=DEBUG_MODE)
     elif mode == 'sc':
         if os.path.exists(CONFIG_FILE):
             asset_symbols = json.loads(open(CONFIG_FILE, 'r+').read())
             for k in asset_symbols:
-                order_percent(0, symbol=k + 'btc', asset=k, order_type='market', amount_discount=0.02, debug=False)
+                order_percent(0, symbol=k + 'btc', asset=k, order_type=SELL_ORDER_TYPE, amount_discount=AMOUNT_DISCOUNT, debug=DEBUG_MODE)
             os.remove(CONFIG_FILE)
         asset_symbols = select_coins()
         if len(asset_symbols) == 0:
@@ -195,9 +217,7 @@ if __name__ == '__main__':
             print('deleting duplicated model...')
         with open(CONFIG_FILE, 'r+') as cf:
             asset_symbols = json.loads(cf.read())
-        asset_data = lfilter(lambda x: x[1] is not None, lmap(lambda x: (x, kline(x, interval=data_frequency, count=bar_count)), asset_symbols))
-        asset_data = lmap(lambda x: (x[0], generate_tech_data(x[1], close_name='close', high_name='high', low_name='low', open_name='open', max_time_window=10)), asset_data)
-        asset_data = OrderedDict(asset_data)
-        asset_data = pd.Panel(asset_data)
+        asset_data = klines(asset_symbols, interval=TICK_INTERVAL, count=BAR_COUNT)
+        asset_data = pre_process(asset_data, max_time_window=MAX_PRE_PROCESSING_WINDOW)
         print('start to create new model')
         create_new_model(asset_data=asset_data, model_path=MODEL_PATH)

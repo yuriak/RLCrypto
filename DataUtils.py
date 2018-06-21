@@ -4,6 +4,7 @@ import numpy as np
 import talib
 import statsmodels.api as sm
 from statsmodels import regression
+from collections import OrderedDict
 
 lmap = lambda func, it: list(map(lambda x: func(x), it))
 lfilter = lambda func, it: list(filter(lambda x: func(x), it))
@@ -39,6 +40,11 @@ def generate_tech_data(stock, open_name, close_name, high_name, low_name, max_ti
     data = data.dropna().astype(np.float32)
     return data
 
+def pre_process(asset_data, max_time_window=10):
+    asset_data = lmap(lambda x: (x[0], generate_tech_data(x[1], close_name='close', high_name='high', low_name='low', open_name='open', max_time_window=max_time_window)), asset_data)
+    asset_data = OrderedDict(asset_data)
+    asset_data = pd.Panel(asset_data)
+    return asset_data
 
 
 
