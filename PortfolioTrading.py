@@ -14,9 +14,10 @@ MODEL_PATH = './PG_Portfolio1'
 # portfolio selection
 TRADING_TICK_INTERVAL = '30min'
 PORTFOLIO_SELECTION_TICK_INTERVAL = '5min'
+PORTFOLIO_SELECTION_BAR_COUNT=500
 BAR_COUNT = 2000
-RISK_ASSET_NUMBER = 1
-RISK_FREE_ASSET_NUMBER = 1
+RISK_ASSET_NUMBER = 0
+RISK_FREE_ASSET_NUMBER = 2
 asset_symbols = []
 
 # pre-processing parameters
@@ -45,7 +46,7 @@ SELL_ORDER_TYPE = 'market'
 def select_coins(method='CAPM', risky_number=RISK_ASSET_NUMBER, risk_free_number=RISK_FREE_ASSET_NUMBER):
     symbols = lmap(lambda x: x['base-currency'], lfilter(lambda x: x['symbol-partition']=='innovation' and x['quote-currency'] == 'btc', get_symbols()['data']))
     print('fetching data')
-    asset_data = klines(symbols, interval=PORTFOLIO_SELECTION_TICK_INTERVAL, count=BAR_COUNT)
+    asset_data = klines(symbols, interval=PORTFOLIO_SELECTION_TICK_INTERVAL, count=PORTFOLIO_SELECTION_BAR_COUNT)
     print('building data')
     asset_data = OrderedDict(asset_data)
     asset_data = pd.Panel(asset_data)
