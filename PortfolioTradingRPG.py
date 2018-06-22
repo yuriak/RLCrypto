@@ -9,7 +9,7 @@ import shutil
 
 LOG_FILE = 'portfolio_log.csv'
 CONFIG_FILE = 'portfolio_config.json'
-MODEL_PATH = './PG_Portfolio1'
+MODEL_PATH = './RPG_Portfolio1'
 
 # portfolio selection
 TRADING_TICK_INTERVAL = '30min'
@@ -21,20 +21,21 @@ RISK_FREE_ASSET_NUMBER = 1
 asset_symbols = []
 
 # pre-processing parameters
-MAX_PRE_PROCESSING_WINDOW = 10
+MAX_PRE_PROCESSING_WINDOW = 20
 
 # training hyper-parameters
 REWARD_THRESHOLD = 0.5
-FEE = 1e-5
+FEE = 1e-4
 NORMALIZE_LENGTH = 10
 # total training length is BATCH_NUMBER*BATCH_SIZE
-BATCH_SIZE = 50
-BATCH_NUMBER = 20
+TRAIN_BATCH_SIZE = 40
+TRAIN_BATCH_NUMBER = 40
 MAX_TRAINING_EPOCH = 30
 LEARNING_RATE = 1e-3
-
+TEST_BATCH_NUMBER = 10
 #  testing hyper-parameters
-TEST_LENGTH = 1000
+TEST_BATCH_SIZE = 50
+TEST_BATCH_NUMBER = 10
 
 # trading hyper-parameters
 AMOUNT_DISCOUNT = 0.1
@@ -75,13 +76,15 @@ def select_coins(method='CAPM', risky_number=RISK_ASSET_NUMBER, risk_free_number
         return []
 
 
-def create_new_model(asset_data, c=FEE, normalize_length=NORMALIZE_LENGTH, batch_size=BATCH_SIZE, batch_number=BATCH_NUMBER, max_epoch=MAX_TRAINING_EPOCH, learning_rate=LEARNING_RATE, pass_threshold=REWARD_THRESHOLD, model_path='./PG_Portfolio'):
+def create_new_model(asset_data, c=FEE, normalize_length=NORMALIZE_LENGTH, batch_size=TRAIN_BATCH_SIZE, batch_number=TRAIN_BATCH_NUMBER, max_epoch=MAX_TRAINING_EPOCH, learning_rate=LEARNING_RATE, pass_threshold=REWARD_THRESHOLD, model_path='./PG_Portfolio'):
     current_model_reward = -np.inf
     model = None
     while current_model_reward < pass_threshold:
-        model = PG_Crypto_portfolio(action_size=asset_data.shape[0] + 1, feature_number=asset_data.shape[2] * asset_data.shape[0], learning_rate=learning_rate)
+        model = RPG_Crypto_portfolio(action_size=asset_data.shape[0] + 1, feature_number=asset_data.shape[2] * asset_data.shape[0], learning_rate=learning_rate)
         model.init_model()
         model.restore_buffer()
+        train_mean_r = []
+        test_mean_r = []
         for e in range(max_epoch):
             test_reward = []
             test_actions = []
@@ -92,26 +95,36 @@ def create_new_model(asset_data, c=FEE, normalize_length=NORMALIZE_LENGTH, batch
                     state = asset_data[:, t - normalize_length:t, :].values
                     state = state.reshape((state.shape[1], state.shape[0] * state.shape[2]))
                     state = z_score(state)[None, -1]
+                    next_state = asset_data[:, t - normalize_length + 1:t + 1, :].values
+                    next_state = next_state.reshape((next_state.shape[1], next_state.shape[0] * next_state.shape[2]))
+                    next_state = z_score(next_state)[None, -1]
+                    
+                    model.save_current_state(s=state[0])
                     action = model.trade(state, train=True, drop=1.0)
                     r = np.sum(asset_data[:, :, 'diff'].iloc[t].values * action[:-1] - c * np.sum(np.abs(previous_action - action)))
-                    model.save_transation(a=action, s=state[0], r=r)
+                    model.save_transation(a=action, r=r, s_next=next_state[0])
                     previous_action = action
                     train_reward.append(r)
                 loss = model.train(drop=1.0)
                 model.restore_buffer()
             model.restore_buffer()
-            print(e, 'train_reward', np.sum(train_reward))
+            print(e, 'train_reward', np.sum(train_reward), np.mean(train_reward))
+            train_mean_r.append(np.mean(train_reward))
             previous_action = np.zeros(asset_data.shape[0] + 1)
             for t in range(batch_size * batch_number + normalize_length, asset_data.shape[1]):
                 state = asset_data[:, t - normalize_length:t, :].values
                 state = state.reshape((state.shape[1], state.shape[0] * state.shape[2]))
                 state = z_score(state)[None, -1]
+                model.save_current_state(s=state[0])
                 action = model.trade(state, train=False)
                 r = np.sum(asset_data[:, :, 'diff'].iloc[t].values * action[:-1] - c * np.sum(np.abs(previous_action - action)))
                 previous_action = action
+                if t % batch_size == 0:
+                    model.restore_buffer()
                 test_reward.append(r)
                 test_actions.append(action)
-            print(e, 'test_reward', np.sum(test_reward))
+            print(e, 'test_reward', np.sum(test_reward), np.mean(test_reward))
+            test_mean_r.append(np.mean(test_reward))
             model.restore_buffer()
             current_model_reward = np.sum(test_reward)
             if np.sum(test_reward) > pass_threshold:
@@ -122,7 +135,7 @@ def create_new_model(asset_data, c=FEE, normalize_length=NORMALIZE_LENGTH, batch
     return model
 
 
-def backtest(asset_data, model, train_length=BATCH_NUMBER * BATCH_SIZE, normalize_length=NORMALIZE_LENGTH, c=FEE):
+def backtest(asset_data, model, train_length=TRAIN_BATCH_NUMBER * TRAIN_BATCH_SIZE, batch_size=TEST_BATCH_SIZE, normalize_length=NORMALIZE_LENGTH, c=FEE):
     previous_action = np.zeros(asset_data.shape[0] + 1)
     test_reward = []
     test_actions = []
@@ -130,23 +143,29 @@ def backtest(asset_data, model, train_length=BATCH_NUMBER * BATCH_SIZE, normaliz
         state = asset_data[:, t - normalize_length:t, :].values
         state = state.reshape((state.shape[1], state.shape[0] * state.shape[2]))
         state = z_score(state)[None, -1]
-        action = model.trade(state, train=False)
+        model.save_current_state(s=state[0])
+        action = model.trade(state, train=False, prob=False)
         r = np.sum(asset_data[:, :, 'diff'].iloc[t].values * action[:-1] - c * np.sum(np.abs(previous_action - action)))
         previous_action = action
+        if t % batch_size == 0:
+            model.restore_buffer()
         test_reward.append(r)
         test_actions.append(action)
     print('back test_reward', np.sum(test_reward))
     return np.sum(test_reward)
 
 
-def real_trade(asset_data, assets, normalize_length=NORMALIZE_LENGTH, debug=DEBUG_MODE, model_path='./PG_Portfolio', log_path='portfolio_log.csv'):
-    model = PG_Crypto_portfolio(action_size=asset_data.shape[0] + 1, feature_number=asset_data.shape[2] * asset_data.shape[0])
+def real_trade(asset_data, assets, normalize_length=NORMALIZE_LENGTH, batch_size=TEST_BATCH_SIZE, debug=DEBUG_MODE, model_path=MODEL_PATH, log_path=LOG_FILE):
+    model = RPG_Crypto_portfolio(action_size=asset_data.shape[0] + 1, feature_number=asset_data.shape[2] * asset_data.shape[0])
     model.load_model(model_path=model_path)
     backtest(asset_data, model=model)
-    state = asset_data[:, - normalize_length:, :].values
-    state = state.reshape((state.shape[1], state.shape[0] * state.shape[2]))
-    state = z_score(state)[None, -1]
-    action = model.trade(state, train=False)
+    model.restore_buffer()
+    for t in range(asset_data.shape[1] - batch_size, asset_data.shape[1]):
+        state = asset_data[:, t - normalize_length + 1:t + 1, :].values
+        state = state.reshape((state.shape[1], state.shape[0] * state.shape[2]))
+        state = z_score(state)[None, -1]
+        model.save_current_state(s=state[0])
+        action = model.trade(state, train=False, prob=False)
     action = list(zip(assets, action[:-1]))
     action = sorted(action, key=lambda x: x[1])
     print('predict action', action)
