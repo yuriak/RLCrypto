@@ -26,7 +26,7 @@ def klines(assets, interval='15min', count=500):
     return lfilter(lambda x: x[1] is not None, lmap(lambda x: (x, kline(x, interval=interval, count=count)), assets))
 
 
-def order_percent(target_percent, symbol='kanbtc', asset='kan', order_type='limit', price_discount=0, amount_discount=0.05, debug=True):
+def order_percent(target_percent, symbol='kanbtc', asset='kan', order_type='limit', price_discount=0, amount_discount=0.05, debug=True, max_asset_percent=1.0):
     current_order_info = orders_list(symbol=symbol, states='submitted')['data']
     print('current order info', current_order_info)
     if len(current_order_info) > 0:
@@ -50,7 +50,7 @@ def order_percent(target_percent, symbol='kanbtc', asset='kan', order_type='limi
     max_buy_amount = 0
     max_sell_amount = 0
     if len(btc_balance) > 0:
-        max_buy_amount = float(btc_balance[0]['balance']) / float(market_price)
+        max_buy_amount = (float(btc_balance[0]['balance']) / float(market_price))*max_asset_percent
     if len(asset_balance) > 0:
         max_sell_amount = float(asset_balance[0]['balance'])
     available_balance = max_buy_amount + max_sell_amount
