@@ -28,14 +28,14 @@ REWARD_THRESHOLD = 0.5
 FEE = 1e-4
 NORMALIZE_LENGTH = 10
 # total training length is BATCH_NUMBER*BATCH_SIZE
-TRAIN_BATCH_SIZE = 40
-TRAIN_BATCH_NUMBER = 40
+TRAIN_BATCH_SIZE = 30
+TRAIN_LENGTH = 1500
 MAX_TRAINING_EPOCH = 30
 LEARNING_RATE = 1e-3
-TEST_BATCH_NUMBER = 10
+
 #  testing hyper-parameters
 TEST_BATCH_SIZE = 50
-TEST_BATCH_NUMBER = 10
+TEST_LENGTH = 400
 
 # trading hyper-parameters
 AMOUNT_DISCOUNT = 0.1
@@ -76,7 +76,7 @@ def select_coins(method='CAPM', risky_number=RISK_ASSET_NUMBER, risk_free_number
         return []
 
 
-def create_new_model(asset_data, c=FEE, normalize_length=NORMALIZE_LENGTH, batch_size=TRAIN_BATCH_SIZE, batch_number=TRAIN_BATCH_NUMBER, max_epoch=MAX_TRAINING_EPOCH, learning_rate=LEARNING_RATE, pass_threshold=REWARD_THRESHOLD, model_path='./PG_Portfolio'):
+def create_new_model(asset_data, c=FEE, normalize_length=NORMALIZE_LENGTH, batch_size=TRAIN_BATCH_SIZE, train_length=TRAIN_LENGTH, max_epoch=MAX_TRAINING_EPOCH, learning_rate=LEARNING_RATE, pass_threshold=REWARD_THRESHOLD, model_path='./PG_Portfolio'):
     current_model_reward = -np.inf
     model = None
     while current_model_reward < pass_threshold:
@@ -90,28 +90,28 @@ def create_new_model(asset_data, c=FEE, normalize_length=NORMALIZE_LENGTH, batch
             test_actions = []
             train_reward = []
             previous_action = np.zeros(asset_data.shape[0] + 1)
-            for b in range(batch_number):
-                for t in range(b * batch_size + normalize_length, (b + 1) * batch_size + normalize_length):
-                    state = asset_data[:, t - normalize_length:t, :].values
-                    state = state.reshape((state.shape[1], state.shape[0] * state.shape[2]))
-                    state = z_score(state)[None, -1]
-                    next_state = asset_data[:, t - normalize_length + 1:t + 1, :].values
-                    next_state = next_state.reshape((next_state.shape[1], next_state.shape[0] * next_state.shape[2]))
-                    next_state = z_score(next_state)[None, -1]
-                    
-                    model.save_current_state(s=state[0])
-                    action = model.trade(state, train=True, drop=1.0)
-                    r = np.sum(asset_data[:, :, 'diff'].iloc[t].values * action[:-1] - c * np.sum(np.abs(previous_action - action)))
-                    model.save_transation(a=action, r=r, s_next=next_state[0])
-                    previous_action = action
-                    train_reward.append(r)
-                loss = model.train(drop=1.0)
-                model.restore_buffer()
+            for t in range(normalize_length, train_length):
+                state = asset_data[:, t - normalize_length:t, :].values
+                state = state.reshape((state.shape[1], state.shape[0] * state.shape[2]))
+                state = z_score(state)[None, -1]
+                next_state = asset_data[:, t - normalize_length + 1:t + 1, :].values
+                next_state = next_state.reshape((next_state.shape[1], next_state.shape[0] * next_state.shape[2]))
+                next_state = z_score(next_state)[None, -1]
+                
+                model.save_current_state(s=state[0])
+                action = model.trade(state, train=True, drop=1.0)
+                r = np.sum(asset_data[:, :, 'diff'].iloc[t].values * action[:-1] - c * np.sum(np.abs(previous_action - action)))
+                model.save_transation(a=action, r=r, s_next=next_state[0])
+                previous_action = action
+                train_reward.append(r)
+                if t % batch_size == 0:
+                    model.train(drop=0.8)
+                    model.restore_buffer()
             model.restore_buffer()
             print(e, 'train_reward', np.sum(train_reward), np.mean(train_reward))
             train_mean_r.append(np.mean(train_reward))
             previous_action = np.zeros(asset_data.shape[0] + 1)
-            for t in range(batch_size * batch_number + normalize_length, asset_data.shape[1]):
+            for t in range(train_length, asset_data.shape[1]):
                 state = asset_data[:, t - normalize_length:t, :].values
                 state = state.reshape((state.shape[1], state.shape[0] * state.shape[2]))
                 state = z_score(state)[None, -1]
@@ -135,11 +135,11 @@ def create_new_model(asset_data, c=FEE, normalize_length=NORMALIZE_LENGTH, batch
     return model
 
 
-def backtest(asset_data, model, train_length=TRAIN_BATCH_NUMBER * TRAIN_BATCH_SIZE, batch_size=TEST_BATCH_SIZE, normalize_length=NORMALIZE_LENGTH, c=FEE):
+def backtest(asset_data, model, test_length=TEST_LENGTH, batch_size=TEST_BATCH_SIZE, normalize_length=NORMALIZE_LENGTH, c=FEE):
     previous_action = np.zeros(asset_data.shape[0] + 1)
     test_reward = []
     test_actions = []
-    for t in range(asset_data.shape[1] - train_length, asset_data.shape[1]):
+    for t in range(asset_data.shape[1] - test_length, asset_data.shape[1]):
         state = asset_data[:, t - normalize_length:t, :].values
         state = state.reshape((state.shape[1], state.shape[0] * state.shape[2]))
         state = z_score(state)[None, -1]

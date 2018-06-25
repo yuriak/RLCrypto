@@ -308,11 +308,6 @@ class DRL_Crypto_portfolio(object):
             self.rnn_output, _ = tf.nn.dynamic_rnn(inputs=self.rnn_input, cell=cells, dtype=tf.float32)
             #             self.rnn_output=tf.contrib.layers.layer_norm(self.rnn_output)
             self.a_prob = tf.unstack(self.rnn_output, axis=0)[0]
-
-        # with tf.variable_scope('supervised',initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
-        #             self.state_predict = self._add_dense_layer(inputs=self.rnn_output, output_shape=hidden_units_number, drop_keep_prob=self.dropout_keep_prob, act=tf.nn.relu, use_bias=True)
-        #             self.state_predict = self._add_dense_layer(inputs=self.rnn_output, output_shape=[feature_number], drop_keep_prob=self.dropout_keep_prob, act=None, use_bias=True)
-        #             self.state_loss=tf.losses.mean_squared_error(self.state_predict,self.s_next)
         
         with tf.variable_scope('direct_RL', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
             #             self.rnn_output=tf.stop_gradient(self.rnn_output)
@@ -379,19 +374,6 @@ class DRL_Crypto_portfolio(object):
         a_prob = a_prob[-1][-1].flatten()
         return a_prob
     
-    #         if train:
-    #             a_indices = np.arange(a_prob.shape[0])
-    #             target_index=np.random.choice(a_indices, p=a_prob)
-    #             a=np.zeros(a_prob.shape[0])
-    #             a[target_index]=1.0
-    #             return a
-    #         else:
-    #             if prob:
-    #                 return a_prob
-    #             target_index=np.argmax(a_prob)
-    #             a=np.zeros(a_prob.shape[0])
-    #             a[target_index]=1.0
-    #             return a
     def load_model(self, model_path='./RPGModel'):
         self.saver.restore(self.session, model_path + '/model')
     
@@ -400,3 +382,110 @@ class DRL_Crypto_portfolio(object):
             os.mkdir(model_path)
         model_file = model_path + '/model'
         self.saver.save(self.session, model_file)
+
+
+class DuelingDQN_portfolio(object):
+    def __init__(self, a_dim, s_dim, buffer_size, batch_size, update_target_interval=50, epsilon=0.9, gamma=0.9, learning_rate=1e-3):
+        tf.reset_default_graph()
+        self.a_dim, self.s_dim = a_dim, s_dim
+        self.buffer_size = buffer_size
+        self.batch_size = batch_size
+        self.buffer = np.zeros((self.buffer_size, self.s_dim * 2 + 2), dtype=np.float32)
+        self.buffer_length = 0
+        self.update_target_interval = update_target_interval
+        self.critic_loss = 0
+        self.total_step = 0
+        self.epsilon = epsilon
+        self.learning_rate = learning_rate
+        self.gamma = gamma
+        self.s = tf.placeholder(tf.float32, [None, self.s_dim], name='s')
+        self.s_next = tf.placeholder(tf.float32, [None, self.s_dim], name='s_next')
+        self.q_next = tf.placeholder(tf.float32, [None, self.a_dim], name='q_next')
+        
+        with tf.variable_scope('q_eval', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)) as scope:
+            self.q_eval = self._build_net(self.s, scope)
+        
+        with tf.variable_scope('q_target', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)) as scope:
+            self.q_target = self._build_net(self.s_next, scope)
+        
+        with tf.variable_scope('loss'):
+            self.loss = tf.reduce_mean(tf.squared_difference(self.q_next, self.q_eval))
+        with tf.variable_scope('train'):
+            self.train_op = tf.train.RMSPropOptimizer(self.learning_rate).minimize(self.loss)
+            self.e_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='q_eval')
+            self.t_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='q_target')
+            self.update_q_target_op = [tf.assign(t, e) for t, e in zip(self.t_params, self.e_params)]
+        self.init_op = tf.global_variables_initializer()
+        self.session = tf.Session()
+        self.saver = tf.train.Saver()
+    
+    def init_model(self):
+        self.session.run(self.init_op)
+    
+    def _build_net(self, s, scope):
+        with tf.variable_scope(scope):
+            net = tf.layers.dense(s, 64, activation=tf.nn.tanh, name='l1')
+            net = tf.layers.dense(net, 32, activation=tf.nn.tanh, name='l2')
+            value = tf.layers.dense(net, 1, activation=None, name='a')
+            advantage = tf.layers.dense(net, self.a_dim, activation=None, name='advantage')
+            q = value + (advantage - tf.reduce_mean(advantage, axis=1, keep_dims=True))
+            return q
+    
+    def trade(self, s, train=False):
+        q = self.session.run(self.q_eval, {self.s: s})
+        a = np.argmax(q)
+        action = np.zeros(self.a_dim)
+        if train:
+            if np.random.uniform() < self.epsilon:
+                action[a] = 1.0
+                return action
+            else:
+                action[np.random.randint(0, self.a_dim)] = 1.0
+                return action
+        action[a] = 1.0
+        return action
+    
+    def update_target(self):
+        self.session.run(self.update_q_target_op)
+    
+    def train(self):
+        if self.buffer_length < self.buffer_size:
+            return
+        if self.total_step % self.update_target_interval == 0:
+            self.session.run(self.update_q_target_op)
+        s, a, r, s_next = self.get_transition_batch()
+        q_eval, q_target = self.session.run([self.q_eval, self.q_target], {self.s: s, self.s_next: s_next})
+        b_indices = np.arange(self.batch_size, dtype=np.int32)
+        q_next = q_eval.copy()
+        q_next[b_indices, a.astype(np.int)] = r + self.gamma * np.max(q_target, axis=1)
+        _, self.critic_loss = self.session.run([self.train_op, self.loss], {self.s: s, self.q_next: q_next})
+        self.total_step += 1
+    
+    def save_transition(self, s, a, r, s_next):
+        a = np.argmax(a)
+        transition = np.hstack((s, [a], [r], s_next))
+        self.buffer[self.buffer_length % self.buffer_size, :] = transition
+        self.buffer_length += 1
+    
+    def get_transition_batch(self):
+        indices = np.random.choice(self.buffer_size, size=self.batch_size)
+        batch = self.buffer[indices, :]
+        s = batch[:, :self.s_dim]
+        a = batch[:, self.s_dim: self.s_dim + 1]
+        r = batch[:, -self.s_dim - 1: -self.s_dim]
+        s_next = batch[:, -self.s_dim:]
+        return s, a, r, s_next
+    
+    def restore_buffer(self):
+        self.buffer = np.zeros((self.buffer_size, self.s_dim + 1 + 1 + self.s_dim))
+        self.buffer_length = 0
+    
+    def load_model(self, model_path='./DRLModel'):
+        self.saver.restore(self.session, model_path + '/model')
+    
+    def save_model(self, model_path='./DRLModel'):
+        if not os.path.exists(model_path):
+            os.mkdir(model_path)
+        model_file = model_path + '/model'
+        self.saver.save(self.session, model_file)
+
