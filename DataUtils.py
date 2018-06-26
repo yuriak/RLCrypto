@@ -49,9 +49,9 @@ def pre_process(asset_data, max_time_window=10):
 
 
 def maxdrawdown(arr):
-    i = np.argmax((np.maximum.accumulate(arr) - arr) / np.maximum.accumulate(arr))  # end of the period
+    i = np.argmax((np.maximum.accumulate(arr) - arr))  # end of the period
     j = np.argmax(arr[:i])  # start of period
-    return arr[j] - arr[i]
+    return (arr[j] - arr[i])
 
 def max_arbitrage(arr):
     return maxdrawdown(arr[::-1])
