@@ -48,6 +48,15 @@ def pre_process(asset_data, max_time_window=10):
     return asset_data
 
 
+def maxdrawdown(arr):
+    i = np.argmax((np.maximum.accumulate(arr) - arr) / np.maximum.accumulate(arr))  # end of the period
+    j = np.argmax(arr[:i])  # start of period
+    return arr[j] - arr[i]
+
+def max_arbitrage(arr):
+    return maxdrawdown(arr[::-1])
+
+
 def find_cointegrated_pairs(dataframe):
     n = dataframe.shape[1]
     pvalue_matrix = np.ones((n, n))
