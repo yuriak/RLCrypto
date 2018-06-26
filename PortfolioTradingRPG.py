@@ -206,7 +206,7 @@ if __name__ == '__main__':
         with open(CONFIG_FILE, 'r+') as cf:
             asset_symbols = json.loads(cf.read())
         asset_data = klines(asset_symbols, interval=TRADING_TICK_INTERVAL, count=BAR_COUNT)
-        asset_data = pre_process(asset_data, max_time_window=MAX_PRE_PROCESSING_WINDOW)
+        asset_data = default_pre_process(asset_data)
         print('start to create new model')
         create_new_model(asset_data=asset_data, model_path=MODEL_PATH)
     elif mode == 'trade':

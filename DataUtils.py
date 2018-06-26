@@ -41,6 +41,49 @@ def generate_tech_data(stock, open_name, close_name, high_name, low_name, max_ti
     return data
 
 
+def generate_tech_data_default(stock, open_name, close_name, high_name, low_name, volume_name='vol'):
+    open_price = stock[open_name].values
+    close_price = stock[close_name].values
+    low_price = stock[low_name].values
+    high_price = stock[high_name].values
+    volume = stock[volume_name].values
+    data = stock.copy()
+    data['MOM'] = talib.MOM(close_price)
+    data['HT_DCPERIOD'] = talib.HT_DCPERIOD(close_price)
+    data['HT_DCPHASE'] = talib.HT_DCPHASE(close_price)
+    data['sine'], data['leadsine'] = talib.HT_SINE(close_price)
+    data['inphase'], data['quadrature'] = talib.HT_PHASOR(close_price)
+    data['ADXR'] = talib.ADXR(high_price, low_price, close_price)
+    data['APO'] = talib.APO(close_price)
+    data['AROON_UP'], _ = talib.AROON(high_price, low_price)
+    data['CCI'] = talib.CCI(high_price, low_price, close_price)
+    data['PLUS_DI'] = talib.PLUS_DI(high_price, low_price, close_price)
+    data['PPO'] = talib.PPO(close_price)
+    data['macd'], data['macd_sig'], data['macd_hist'] = talib.MACD(close_price)
+    data['CMO'] = talib.CMO(close_price)
+    data['ROCP'] = talib.ROCP(close_price)
+    data['fastk'], data['fastd'] = talib.STOCHF(high_price, low_price, close_price)
+    data['TRIX'] = talib.TRIX(close_price)
+    data['ULTOSC'] = talib.ULTOSC(high_price, low_price, close_price)
+    data['WILLR'] = talib.WILLR(high_price, low_price, close_price)
+    data['NATR'] = talib.NATR(high_price, low_price, close_price)
+    data['MFI'] = talib.MFI(high_price, low_price, close_price, volume)
+    data['RSI'] = talib.RSI(close_price)
+    data['AD'] = talib.AD(high_price, low_price, close_price, volume)
+    data['OBV'] = talib.OBV(close_price, volume)
+    data['EMA'] = talib.EMA(close_price)
+    data['SAREXT'] = talib.SAREXT(high_price, low_price)
+    data['TEMA'] = talib.EMA(close_price)
+    data = data.drop([open_name, close_name, high_name, low_name, 'amount', 'count'], axis=1)
+    data = data.dropna().astype(np.float32)
+    return data
+
+def default_pre_process(asset_data):
+    asset_data = lmap(lambda x: (x[0], generate_tech_data_default(x[1], close_name='close', high_name='high', low_name='low', open_name='open',volume_name='vol')), asset_data)
+    asset_data = OrderedDict(asset_data)
+    asset_data = pd.Panel(asset_data)
+    return asset_data
+
 def pre_process(asset_data, max_time_window=10):
     asset_data = lmap(lambda x: (x[0], generate_tech_data(x[1], close_name='close', high_name='high', low_name='low', open_name='open', max_time_window=max_time_window)), asset_data)
     asset_data = OrderedDict(asset_data)
