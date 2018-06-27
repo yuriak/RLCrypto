@@ -194,13 +194,15 @@ class RPG_Crypto_portfolio(object):
         
         with tf.variable_scope('supervised', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
             self.state_predict = self._add_dense_layer(inputs=self.rnn_output, output_shape=hidden_units_number, drop_keep_prob=self.dropout_keep_prob, act=tf.nn.relu, use_bias=True)
+            self.state_predict = tf.contrib.layers.layer_norm(self.state_predict)
             self.state_predict = self._add_dense_layer(inputs=self.rnn_output, output_shape=[feature_number], drop_keep_prob=self.dropout_keep_prob, act=None, use_bias=True)
             self.state_loss = tf.losses.mean_squared_error(self.state_predict, self.s_next)
         
         with tf.variable_scope('policy_gradient', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
             #             self.rnn_output=tf.stop_gradient(self.rnn_output)
-            self.a_prob = self._add_dense_layer(inputs=self.rnn_output, output_shape=hidden_units_number + [action_size], drop_keep_prob=self.dropout_keep_prob, act=tf.nn.relu, use_bias=True)
-            #             self.a_prob = self._add_dense_layer(inputs=self.a_prob, output_shape=, drop_keep_prob=self.dropout_keep_prob, act=None, use_bias=True)
+            self.a_prob = self._add_dense_layer(inputs=self.rnn_output, output_shape=hidden_units_number, drop_keep_prob=self.dropout_keep_prob, act=tf.nn.relu, use_bias=True)
+            self.a_prob = tf.contrib.layers.layer_norm(self.a_prob)
+            self.a_prob = self._add_dense_layer(inputs=self.a_prob, output_shape=[action_size], drop_keep_prob=self.dropout_keep_prob, act=None, use_bias=True)
             self.a_out = tf.nn.softmax(self.a_prob, axis=-1)
             self.negative_cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.a_prob, labels=self.a)
         
