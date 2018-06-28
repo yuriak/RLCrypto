@@ -20,12 +20,9 @@ RISK_ASSET_NUMBER = 1
 RISK_FREE_ASSET_NUMBER = 2
 portfolio = []
 
-# pre-processing parameters
-MAX_PRE_PROCESSING_WINDOW = 20
-
 # training hyper-parameters
 REWARD_THRESHOLD = 0.5
-FEE = 1e-4
+FEE = 1e-5
 NORMALIZE_LENGTH = 10
 # total training length is BATCH_NUMBER*BATCH_SIZE
 TRAIN_BATCH_SIZE = 30
@@ -153,6 +150,7 @@ def backtest(data, model, test_length=TEST_LENGTH, batch_size=TEST_BATCH_SIZE, n
 
 
 def real_trade(data, asset_, max_asset_percent, portfolio_, normalize_length=NORMALIZE_LENGTH, batch_size=TEST_BATCH_SIZE, debug=DEBUG_MODE, model_path=MODEL_PATH):
+    print('start to retrieve model from ',model_path)
     model = RPG_Crypto_portfolio(action_size=2, feature_number=data.shape[1])
     model.load_model(model_path=model_path)
     backtest(data, model=model)
@@ -246,6 +244,7 @@ if __name__ == '__main__':
         asset_data = klines(lmap(lambda x: x[0], portfolio), interval=TRADING_TICK_INTERVAL, count=BAR_COUNT)
         asset_data = default_pre_process(asset_data)
         # warning!!! set debug=False will lose all your money @_@
+        print('start to trade:',portfolio)
         with open(LOG_FILE, 'a+') as f:
             trade_action = {}
             for asset, weight in portfolio:

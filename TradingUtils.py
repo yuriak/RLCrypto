@@ -115,6 +115,7 @@ def order_percent(target_percent, symbol='kanbtc', asset='kan', order_type='limi
 
 
 def re_balance(target_percent, symbol, asset, portfolio, base_currency, order_type='limit', price_discount=0, amount_discount=0.05, debug=True, max_asset_percent=1.0):
+    portfolio = portfolio + [base_currency]
     current_order_info = orders_list(symbol=symbol, states='submitted')['data']
     print('current order info', current_order_info)
     if len(current_order_info) > 0:
@@ -140,20 +141,20 @@ def re_balance(target_percent, symbol, asset, portfolio, base_currency, order_ty
     asset_balance = 0
     for currency in portfolio:
         balance = list(filter(lambda x: x['currency'] == currency and x['type'] == 'trade', balance_info['data']['list']))
-        ticker = get_ticker(currency + base_currency)['tick']
-        price = ticker['close']
-        if currency == asset:
-            market_price = round(ticker['close'], price_precision)
-            limit_buy_price = round(float(ticker['bid'][0]) * (1 - price_discount), price_precision)
-            limit_sell_price = round(float(ticker['ask'][0]) * (1 + price_discount), price_precision)
-        
         if len(balance) > 0:
-            asset_value = float(balance[0]['balance']) * price
-            portfolio_value += asset_value
             if currency == base_currency:
                 base_balance = float(balance[0]['balance'])
-            if currency == asset:
-                asset_balance = float(balance[0]['balance'])
+                portfolio_value += base_balance
+            else:
+                ticker = get_ticker(currency + base_currency)['tick']
+                price = ticker['close']
+                asset_value = float(balance[0]['balance']) * price
+                portfolio_value += asset_value
+                if currency == asset:
+                    asset_balance = float(balance[0]['balance'])
+                    market_price = round(ticker['close'], price_precision)
+                    limit_buy_price = round(float(ticker['bid'][0]) * (1 - price_discount), price_precision)
+                    limit_sell_price = round(float(ticker['ask'][0]) * (1 + price_discount), price_precision)
     
     max_asset_value = portfolio_value * max_asset_percent if base_balance > portfolio_value * max_asset_percent else base_balance
     max_asset_balance = max_asset_value / market_price

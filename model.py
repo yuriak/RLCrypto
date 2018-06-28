@@ -185,8 +185,8 @@ class RPG_Crypto_portfolio(object):
         self.s_next_buffer = []
         self.dropout_keep_prob = tf.placeholder(dtype=tf.float32, shape=[], name='dropout_keep_prob')
         with tf.variable_scope('rnn_encoder', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
-            cell=self._add_GRU(units_number=128,keep_prob=self.dropout_keep_prob)
-            # cells = self._add_GRUs(units_number=[256, 128], activation=[tf.nn.relu, tf.nn.tanh])
+            cell = self._add_GRU(units_number=128, activation=tf.nn.tanh, keep_prob=self.dropout_keep_prob)
+            #             cells=self._add_GRUs(units_number=[256,128],activation=[tf.nn.relu,tf.nn.tanh])
             self.rnn_input = tf.expand_dims(self.s, axis=0)
             self.rnn_output, _ = tf.nn.dynamic_rnn(inputs=self.rnn_input, cell=cell, dtype=tf.float32)
             #             self.rnn_output=tf.contrib.layers.layer_norm(self.rnn_output)
@@ -194,22 +194,25 @@ class RPG_Crypto_portfolio(object):
         
         with tf.variable_scope('supervised', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
             self.state_predict = self._add_dense_layer(inputs=self.rnn_output, output_shape=hidden_units_number, drop_keep_prob=self.dropout_keep_prob, act=tf.nn.relu, use_bias=True)
-            self.state_predict = tf.contrib.layers.layer_norm(self.state_predict)
+            #             self.state_predict=tf.contrib.layers.layer_norm(self.state_predict)
             self.state_predict = self._add_dense_layer(inputs=self.rnn_output, output_shape=[feature_number], drop_keep_prob=self.dropout_keep_prob, act=None, use_bias=True)
             self.state_loss = tf.losses.mean_squared_error(self.state_predict, self.s_next)
         
         with tf.variable_scope('policy_gradient', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
             #             self.rnn_output=tf.stop_gradient(self.rnn_output)
             self.a_prob = self._add_dense_layer(inputs=self.rnn_output, output_shape=hidden_units_number, drop_keep_prob=self.dropout_keep_prob, act=tf.nn.relu, use_bias=True)
-            self.a_prob = tf.contrib.layers.layer_norm(self.a_prob)
+            #             self.a_prob=tf.contrib.layers.layer_norm(self.a_prob)
             self.a_prob = self._add_dense_layer(inputs=self.a_prob, output_shape=[action_size], drop_keep_prob=self.dropout_keep_prob, act=None, use_bias=True)
             self.a_out = tf.nn.softmax(self.a_prob, axis=-1)
             self.negative_cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.a_prob, labels=self.a)
         
         with tf.variable_scope('train'):
-            optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-            self.loss = tf.reduce_mean(self.negative_cross_entropy * self.r) + tf.reduce_mean(self.state_loss)
-            self.train_op = optimizer.minimize(self.loss)
+            optimizer_rl = tf.train.AdamOptimizer(learning_rate=learning_rate)
+            optimizer_sl = tf.train.AdamOptimizer(learning_rate=learning_rate * 2)
+            self.rlloss = tf.reduce_mean(self.negative_cross_entropy * self.r)
+            self.slloss = tf.reduce_mean(self.state_loss)
+            self.rltrain_op = optimizer_rl.minimize(self.rlloss)
+            self.sltrain_op = optimizer_sl.minimize(self.slloss)
         self.init_op = tf.global_variables_initializer()
         self.session = tf.Session()
         self.saver = tf.train.Saver()
@@ -224,13 +227,13 @@ class RPG_Crypto_portfolio(object):
             output = tf.nn.dropout(output, drop_keep_prob)
         return output
     
-    def _add_GRU(self, units_number, activation=tf.nn.tanh, keep_prob=1.0):
-        cell = tf.contrib.rnn.LSTMCell(units_number, activation=activation)
+    def _add_GRU(self, units_number, activation=tf.nn.relu, keep_prob=1.0):
+        cell = tf.contrib.rnn.GRUCell(units_number, activation=activation)
         cell = tf.contrib.rnn.DropoutWrapper(cell, input_keep_prob=keep_prob)
         return cell
     
     def _add_GRUs(self, units_number, activation, keep_prob=1.0):
-        cells = tf.contrib.rnn.MultiRNNCell(cells=[self._add_GRU(units_number=n, activation=a,keep_prob=keep_prob) for n, a in zip(units_number, activation)])
+        cells = tf.contrib.rnn.MultiRNNCell(cells=[self._add_GRU(units_number=n, activation=a) for n, a in zip(units_number, activation)])
         return cells
     
     def _add_gru_cell(self, units_number, activation=tf.nn.relu):
@@ -245,8 +248,7 @@ class RPG_Crypto_portfolio(object):
             self.s_next: np.array(self.s_next_buffer),
             self.dropout_keep_prob: drop
         }
-        _, loss = self.session.run([self.train_op, self.loss], feed_dict=feed)
-        return loss
+        self.session.run([self.rltrain_op, self.sltrain_op], feed_dict=feed)
     
     def restore_buffer(self):
         self.a_buffer = []
@@ -282,10 +284,10 @@ class RPG_Crypto_portfolio(object):
             a = np.zeros(a_prob.shape[0])
             a[target_index] = 1.0
             return a
-
+    
     def load_model(self, model_path='./RPGModel'):
         self.saver.restore(self.session, model_path + '/model')
-
+    
     def save_model(self, model_path='./RPGModel'):
         if not os.path.exists(model_path):
             os.mkdir(model_path)
