@@ -74,7 +74,7 @@ def select_coins(method='CAPM', risky_number=RISK_ASSET_NUMBER, risk_free_number
         return []
 
 
-def create_new_model(data,
+def create_new_model(asset_data_,
                      c=FEE,
                      normalize_length=NORMALIZE_LENGTH,
                      batch_size=TRAIN_BATCH_SIZE,
@@ -86,7 +86,7 @@ def create_new_model(data,
     current_model_reward = -np.inf
     model = None
     while current_model_reward < pass_threshold:
-        model = RPG_Portfolio_Stable(action_size=2, feature_number=data.shape[2], learning_rate=learning_rate)
+        model = RPG_Portfolio_Stable(action_size=2, feature_number=asset_data_.shape[2], learning_rate=learning_rate)
         model.init_model()
         model.restore_buffer()
         train_mean_r = []
@@ -95,42 +95,40 @@ def create_new_model(data,
             test_reward = []
             test_actions = []
             train_reward = []
-            previous_action = np.zeros(2)
+            previous_action = np.zeros(asset_data_.shape[0])
             for t in range(normalize_length, train_length):
-                state = data.iloc[t - normalize_length:t, :].values
-                state = z_score(state)[None, -1]
-                next_state = data.iloc[t - normalize_length + 1:t + 1, :].values
-                next_state = z_score(next_state)[None, -1]
-                
-                model.save_current_state(s=state[0])
-                action = model.trade(state, train=True, kp=1.0)
-                r = np.sum(data['diff'].iloc[t].values * action[:-1] - c * np.sum(np.abs(previous_action - action)))
-                model.save_transation(a=action, r=r, s_next=next_state[0])
-                previous_action = action
+                data = asset_data_[:, t - normalize_length:t, :].values
+                state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
+                data = asset_data_[:, t - normalize_length + 1:t + 1, :].values
+                next_state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
+                model.save_current_state(s=state)
+                action_ = model.trade(train=True, kp=1.0, prob=False)
+                r = asset_data_[:, :, 'diff'].iloc[t].values * action_[:, 0] - c * np.abs(previous_action - action_[:, 0])
+                model.save_transation(a=action_, r=r, s_next=next_state)
+                previous_action = action_[:, 0]
                 train_reward.append(r)
                 if t % batch_size == 0:
                     model.train(drop=0.8)
                     model.restore_buffer()
             model.restore_buffer()
-            print(e, 'train_reward', np.sum(train_reward), np.mean(train_reward))
+            print(e, 'train_reward', np.sum(np.mean(train_reward, axis=1)), np.mean(train_reward))
             train_mean_r.append(np.mean(train_reward))
-            previous_action = np.zeros(data.shape[0] + 1)
-            for t in range(train_length, data.shape[0]):
-                state = data.iloc[t - normalize_length:t, :].values
-                state = z_score(state)[None, -1]
-                model.save_current_state(s=state[0])
-                action = model.trade(state, train=False)
-                r = np.sum(data['diff'].iloc[t].values * action[:-1] - c * np.sum(np.abs(previous_action - action)))
-                previous_action = action
+            previous_action = np.zeros(asset_data_.shape[0])
+            for t in range(train_length, asset_data_.shape[0]):
+                data = asset_data_[:, t - normalize_length:t, :].values
+                state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
+                model.save_current_state(s=state)
+                action_ = model.trade(train=False, kp=1.0, prob=False)
+                r = asset_data_[:, :, 'diff'].iloc[t].values * action_[:, 0] - c * np.abs(previous_action - action_[:, 0])
+                test_reward.append(r)
+                test_actions.append(action_)
+                previous_action = action_[:, 0]
                 if t % batch_size == 0:
                     model.restore_buffer()
-                test_reward.append(r)
-                test_actions.append(action)
-            print(e, 'test_reward', np.sum(test_reward), np.mean(test_reward))
+            print(e, 'test_reward', np.sum(np.mean(test_reward, axis=1)), np.mean(test_reward))
             test_mean_r.append(np.mean(test_reward))
             model.restore_buffer()
-            current_model_reward = np.sum(test_reward)
-            if np.sum(test_reward) > pass_threshold:
+            if np.sum(np.mean(test_reward, axis=1)) > pass_threshold:
                 break
         model.restore_buffer()
     print('model created successfully, backtest reward:', current_model_reward)
@@ -138,40 +136,39 @@ def create_new_model(data,
     return model
 
 
-def backtest(data, model, test_length=TEST_LENGTH, batch_size=TEST_BATCH_SIZE, normalize_length=NORMALIZE_LENGTH, c=FEE):
-    previous_action = np.zeros(2)
+def back_test(asset_data_, model, test_length=TEST_LENGTH, batch_size=TEST_BATCH_SIZE, normalize_length=NORMALIZE_LENGTH, c=FEE):
+    previous_action = np.zeros(asset_data_.shape[0])
     test_reward = []
     test_actions = []
-    for t in range(data.shape[0] - test_length, data.shape[0]):
-        state = data.iloc[t - normalize_length:t, :].values
-        state = z_score(state)[None, -1]
-        model.save_current_state(s=state[0])
-        action = model.trade(state, train=False, prob=False)
-        r = np.sum(data['diff'].iloc[t] * action[:-1] - c * np.sum(np.abs(previous_action - action)))
-        previous_action = action
+    for t in range(asset_data_.shape[1] - test_length, asset_data_.shape[1]):
+        data = asset_data_[:, t - normalize_length:t, :].values
+        state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
+        model.save_current_state(s=state)
+        action_ = model.trade(train=False, kp=1.0, prob=False)
+        r = asset_data_[:, :, 'diff'].iloc[t].values * action_[:, 0] - c * np.abs(previous_action - action_[:, 0])
+        test_reward.append(r)
+        test_actions.append(action_)
+        previous_action = action_[:, 0]
         if t % batch_size == 0:
             model.restore_buffer()
-        test_reward.append(r)
-        test_actions.append(action)
-    print('back test_reward', np.sum(test_reward))
-    return np.sum(test_reward)
-
-
-def real_trade(data, asset_, max_asset_percent, portfolio_, normalize_length=NORMALIZE_LENGTH, batch_size=TEST_BATCH_SIZE, debug=DEBUG_MODE, model_path=MODEL_PATH):
-    print('start to retrieve model from ', model_path)
-    model = RPG_Crypto_portfolio(action_size=2, feature_number=data.shape[1])
-    model.load_model(model_path=model_path)
-    backtest(data, model=model)
     model.restore_buffer()
-    action = 0
-    for t in range(data.shape[0] - batch_size, data.shape[0]):
-        state = data.iloc[t - normalize_length + 1:t + 1, :].values
-        state = z_score(state)[None, -1]
-        model.save_current_state(s=state[0])
-        action = model.trade(state, train=False, prob=False)[0]
-    print('predict action', action, 'for asset', asset_)
-    if action > 0:
-        result = re_balance(action,
+    print('back test_reward', np.sum(np.mean(test_reward, axis=1)))
+    return np.sum(np.mean(test_reward, axis=1))
+
+
+def real_trade(asset_data_, asset_, max_asset_percent, portfolio_, normalize_length=NORMALIZE_LENGTH, batch_size=TEST_BATCH_SIZE, debug=DEBUG_MODE, model_path=MODEL_PATH):
+    print('start to retrieve model from ', model_path)
+    model = RPG_Portfolio_Stable(action_size=2, feature_number=asset_data_.shape[2])
+    model.load_model(model_path=model_path)
+    back_test(asset_data_, model=model)
+    for t in range(asset_data_.shape[0] - batch_size, asset_data_.shape[0]):
+        data = asset_data_[:, t - normalize_length + 1:t + 1, :].values
+        state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
+        model.save_current_state(s=state)
+    action_ = model.trade(train=False, kp=1.0, prob=False)[:, 0]
+    print('predict action', action_, 'for asset', asset_)
+    if action_ > 0:
+        result = re_balance(action_,
                             symbol=asset_ + BASE_CURRENCY,
                             asset=asset_,
                             portfolio=portfolio_,
@@ -183,7 +180,7 @@ def real_trade(data, asset_, max_asset_percent, portfolio_, normalize_length=NOR
                             max_asset_percent=max_asset_percent)
         print(result)
     else:
-        result = re_balance(action,
+        result = re_balance(action_,
                             symbol=asset_ + BASE_CURRENCY,
                             asset=asset_,
                             portfolio=portfolio_,
@@ -194,7 +191,7 @@ def real_trade(data, asset_, max_asset_percent, portfolio_, normalize_length=NOR
                             debug=debug,
                             max_asset_percent=max_asset_percent)
         print(result)
-        return action
+        return action_
 
 
 if __name__ == '__main__':
