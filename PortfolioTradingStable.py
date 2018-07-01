@@ -9,7 +9,7 @@ import shutil
 
 LOG_FILE = 'portfolio_log.csv'
 CONFIG_FILE = 'portfolio_config.json'
-MODEL_PATH = './RPG_Portfolio'
+MODEL_PATH = './RPG_Portfolio_Stable'
 
 # portfolio selection
 TRADING_TICK_INTERVAL = '60min'
@@ -25,18 +25,18 @@ REWARD_THRESHOLD = 0.45
 FEE = 1e-5
 NORMALIZE_LENGTH = 10
 # total training length is BATCH_NUMBER*BATCH_SIZE
-TRAIN_BATCH_SIZE = 30
+TRAIN_BATCH_SIZE = 64
 TRAIN_LENGTH = 1500
 MAX_TRAINING_EPOCH = 30
 LEARNING_RATE = 1e-3
 
 #  testing hyper-parameters
-TEST_BATCH_SIZE = 30
+TEST_BATCH_SIZE = 64
 TEST_LENGTH = 400
 
 # trading hyper-parameters
-AMOUNT_DISCOUNT = 0.05
-PRICE_DISCOUNT = -1e-3
+AMOUNT_DISCOUNT = 0.02
+PRICE_DISCOUNT = -5e-3
 DEBUG_MODE = True
 BUY_ORDER_TYPE = 'limit'
 SELL_ORDER_TYPE = 'limit'
@@ -74,11 +74,19 @@ def select_coins(method='CAPM', risky_number=RISK_ASSET_NUMBER, risk_free_number
         return []
 
 
-def create_new_model(data, c=FEE, normalize_length=NORMALIZE_LENGTH, batch_size=TRAIN_BATCH_SIZE, train_length=TRAIN_LENGTH, max_epoch=MAX_TRAINING_EPOCH, learning_rate=LEARNING_RATE, pass_threshold=REWARD_THRESHOLD, model_path='./PG_Portfolio'):
+def create_new_model(data,
+                     c=FEE,
+                     normalize_length=NORMALIZE_LENGTH,
+                     batch_size=TRAIN_BATCH_SIZE,
+                     train_length=TRAIN_LENGTH,
+                     max_epoch=MAX_TRAINING_EPOCH,
+                     learning_rate=LEARNING_RATE,
+                     pass_threshold=REWARD_THRESHOLD,
+                     model_path=MODEL_PATH):
     current_model_reward = -np.inf
     model = None
     while current_model_reward < pass_threshold:
-        model = RPG_Crypto_portfolio(action_size=2, feature_number=data.shape[1], learning_rate=learning_rate)
+        model = RPG_Portfolio_Stable(action_size=2, feature_number=data.shape[2], learning_rate=learning_rate)
         model.init_model()
         model.restore_buffer()
         train_mean_r = []
@@ -95,7 +103,7 @@ def create_new_model(data, c=FEE, normalize_length=NORMALIZE_LENGTH, batch_size=
                 next_state = z_score(next_state)[None, -1]
                 
                 model.save_current_state(s=state[0])
-                action = model.trade(state, train=True, drop=1.0)
+                action = model.trade(state, train=True, kp=1.0)
                 r = np.sum(data['diff'].iloc[t].values * action[:-1] - c * np.sum(np.abs(previous_action - action)))
                 model.save_transation(a=action, r=r, s_next=next_state[0])
                 previous_action = action

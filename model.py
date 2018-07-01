@@ -626,7 +626,7 @@ class RPG_CryptoNG(object):
         self.saver.save(self.session, model_file)
 
 
-class RPG_CryptoNG_ShareV(object):
+class RPG_Portfolio_Stable(object):
     def __init__(self, feature_number, action_size=1, hidden_units_number=[128, 64], learning_rate=0.001):
         tf.reset_default_graph()
         self.s = tf.placeholder(dtype=tf.float32, shape=[None, None, feature_number], name='s')
@@ -641,9 +641,7 @@ class RPG_CryptoNG_ShareV(object):
         self.dropout_keep_prob = tf.placeholder(dtype=tf.float32, shape=[], name='dropout_keep_prob')
         with tf.variable_scope('rnn_encoder', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
             cell = self._add_GRU(units_number=128, activation=tf.nn.tanh, keep_prob=self.dropout_keep_prob)
-            #             self.rnn_input=tf.expand_dims(self.s,axis=0)
             self.rnn_output, _ = tf.nn.dynamic_rnn(inputs=self.s, cell=cell, dtype=tf.float32)
-        # self.rnn_output=tf.unstack(self.rnn_output,axis=0)[0]
         
         with tf.variable_scope('supervised', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
             self.state_predict = self._add_dense_layer(inputs=self.rnn_output, output_shape=hidden_units_number, drop_keep_prob=self.dropout_keep_prob, act=tf.nn.relu, use_bias=True)
@@ -651,7 +649,6 @@ class RPG_CryptoNG_ShareV(object):
             self.state_loss = tf.losses.mean_squared_error(self.state_predict, self.s_next)
         
         with tf.variable_scope('policy_gradient', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
-            #             self.rnn_output=tf.stop_gradient(self.rnn_output)
             self.a_prob = self._add_dense_layer(inputs=self.rnn_output, output_shape=hidden_units_number, drop_keep_prob=self.dropout_keep_prob, act=tf.nn.relu, use_bias=True)
             self.a_prob = self._add_dense_layer(inputs=self.a_prob, output_shape=[action_size], drop_keep_prob=self.dropout_keep_prob, act=None, use_bias=True)
             self.a_out = tf.nn.softmax(self.a_prob, axis=-1)
@@ -660,10 +657,10 @@ class RPG_CryptoNG_ShareV(object):
         with tf.variable_scope('train'):
             optimizer_rl = tf.train.AdamOptimizer(learning_rate=learning_rate)
             optimizer_sl = tf.train.AdamOptimizer(learning_rate=learning_rate * 2)
-            self.rlloss = tf.reduce_mean(self.negative_cross_entropy * self.r)
-            self.slloss = tf.reduce_mean(self.state_loss)
-            self.rltrain_op = optimizer_rl.minimize(self.rlloss)
-            self.sltrain_op = optimizer_sl.minimize(self.slloss)
+            self.rl_loss = tf.reduce_mean(self.negative_cross_entropy * self.r)
+            self.sl_loss = tf.reduce_mean(self.state_loss)
+            self.rl_train_op = optimizer_rl.minimize(self.rl_loss)
+            self.sl_train_op = optimizer_sl.minimize(self.sl_loss)
         self.init_op = tf.global_variables_initializer()
         self.session = tf.Session()
         self.saver = tf.train.Saver()
@@ -691,7 +688,6 @@ class RPG_CryptoNG_ShareV(object):
         return tf.contrib.rnn.GRUCell(num_units=units_number, activation=activation)
     
     def train(self, drop=0.85):
-        #         np.random.shuffle(random_index)
         feed = {
             self.a: np.transpose(np.array(self.a_buffer), axes=[1, 0, 2]),
             self.r: np.transpose(np.array(self.r_buffer), axes=[1, 0]),
@@ -699,7 +695,7 @@ class RPG_CryptoNG_ShareV(object):
             self.s_next: np.transpose(np.array(self.s_next_buffer), axes=[1, 0, 2]),
             self.dropout_keep_prob: drop
         }
-        self.session.run([self.rltrain_op, self.sltrain_op], feed_dict=feed)
+        self.session.run([self.rl_train_op, self.sl_train_op], feed_dict=feed)
     
     def restore_buffer(self):
         self.a_buffer = []
@@ -715,16 +711,12 @@ class RPG_CryptoNG_ShareV(object):
         self.r_buffer.append(r)
         self.s_next_buffer.append(s_next)
     
-    def trade(self, train=False, drop=1.0, prob=False):
-        #         print(np.array(self.a_buffer).shape)
-        #         print(np.transpose(np.array(self.a_buffer),axes=[1,0,2]).shape)
+    def trade(self, train=False, kp=1.0, prob=False):
         feed = {
             self.s: np.transpose(np.array(self.s_buffer), axes=[1, 0, 2]),
-            self.dropout_keep_prob: drop
+            self.dropout_keep_prob: kp
         }
-        a_prob = self.session.run([self.a_out], feed_dict=feed)[0]
-        
-        a_prob = a_prob[:, -1, :]
+        a_prob = self.session.run(self.a_out, feed_dict=feed)[:, -1, :]
         actions = []
         if train:
             for ap in a_prob:
@@ -944,3 +936,154 @@ class DDRPG(object):
             output = tf.layers.dense(output, n, activation=a, use_bias=use_bias, trainable=trainable)
             output = tf.nn.dropout(output, drop_keep_prob)
         return output
+
+
+class RPG_CryptoNG_ShareVNG(object):
+    def __init__(self, s_dim, asset_number, a_dim, buffer_size=64, batch_size=64, hidden_units_number=[128, 64], learning_rate=0.001):
+        tf.reset_default_graph()
+        self.a_dim = a_dim
+        self.buffer_size = buffer_size
+        self.batch_size = batch_size
+        self.asset_number = asset_number
+        self.s_dim = s_dim
+        self.pointer = 0
+        self.a_buffer = np.zeros((self.asset_number, self.buffer_size, self.a_dim))
+        self.r_buffer = np.zeros((self.asset_number, self.buffer_size))
+        self.s_buffer = np.zeros((self.asset_number, self.buffer_size, self.s_dim))
+        self.s_next_buffer = np.zeros((self.asset_number, self.buffer_size, self.s_dim))
+        self.s = tf.placeholder(dtype=tf.float32, shape=[None, None, self.s_dim], name='s')
+        self.a = tf.placeholder(dtype=tf.int32, shape=[None, None, self.a_dim], name='a')
+        self.r = tf.placeholder(dtype=tf.float32, shape=[None, None], name='r')
+        self.s_next = tf.placeholder(dtype=tf.float32, shape=[None, None, s_dim], name='s_next')
+        self.dropout_keep_prob = tf.placeholder(dtype=tf.float32, shape=[], name='dropout_keep_prob')
+        with tf.variable_scope('rnn_encoder', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
+            cell = self._add_GRU(units_number=128, activation=tf.nn.tanh, keep_prob=self.dropout_keep_prob)
+            self.rnn_output, _ = tf.nn.dynamic_rnn(inputs=self.s, cell=cell, dtype=tf.float32)
+        
+        with tf.variable_scope('supervised', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
+            self.state_predict = self._add_dense_layer(inputs=self.rnn_output, output_shape=hidden_units_number, drop_keep_prob=self.dropout_keep_prob, act=tf.nn.relu, use_bias=True)
+            self.state_predict = self._add_dense_layer(inputs=self.rnn_output, output_shape=[s_dim], drop_keep_prob=self.dropout_keep_prob, act=None, use_bias=True)
+            self.state_loss = tf.losses.mean_squared_error(self.state_predict, self.s_next)
+        
+        with tf.variable_scope('policy_gradient', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
+            self.a_prob = self._add_dense_layer(inputs=self.rnn_output, output_shape=hidden_units_number, drop_keep_prob=self.dropout_keep_prob, act=tf.nn.relu, use_bias=True)
+            self.a_prob = self._add_dense_layer(inputs=self.a_prob, output_shape=[2], drop_keep_prob=self.dropout_keep_prob, act=None, use_bias=True)
+            self.a_out = tf.nn.softmax(self.a_prob, axis=-1)
+            self.negative_cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.a_prob, labels=self.a)
+        
+        with tf.variable_scope('train'):
+            optimizer_rl = tf.train.AdamOptimizer(learning_rate=learning_rate)
+            optimizer_sl = tf.train.AdamOptimizer(learning_rate=learning_rate * 2)
+            self.rl_loss = tf.reduce_mean(self.negative_cross_entropy * self.r)
+            self.sl_loss = tf.reduce_mean(self.state_loss)
+            self.rl_train_op = optimizer_rl.minimize(self.rl_loss)
+            self.sl_train_op = optimizer_sl.minimize(self.sl_loss)
+        self.init_op = tf.global_variables_initializer()
+        self.session = tf.Session()
+        self.saver = tf.train.Saver()
+    
+    def init_model(self):
+        self.session.run(self.init_op)
+    
+    def _add_dense_layer(self, inputs, output_shape, drop_keep_prob, act=tf.nn.relu, use_bias=True):
+        output = inputs
+        for n in output_shape:
+            output = tf.layers.dense(output, n, activation=act, use_bias=use_bias)
+            output = tf.nn.dropout(output, drop_keep_prob)
+        return output
+    
+    def _add_GRU(self, units_number, activation=tf.nn.relu, keep_prob=1.0):
+        cell = tf.contrib.rnn.GRUCell(units_number, activation=activation)
+        cell = tf.contrib.rnn.DropoutWrapper(cell, input_keep_prob=keep_prob)
+        return cell
+    
+    def _add_GRUs(self, units_number, activation, keep_prob=1.0):
+        cells = tf.contrib.rnn.MultiRNNCell(cells=[self._add_GRU(units_number=n, activation=a) for n, a in zip(units_number, activation)])
+        return cells
+    
+    def _add_gru_cell(self, units_number, activation=tf.nn.relu):
+        return tf.contrib.rnn.GRUCell(num_units=units_number, activation=activation)
+    
+    def train(self, kp=0.85):
+        if self.pointer < self.buffer_size - 1:
+            return
+        max_upper_bound = self.buffer_size - self.batch_size + 1
+        lower = np.random.randint(low=0, high=max_upper_bound)
+        upper = lower + +self.batch_size
+        
+        feed = {
+            self.a: self.a_buffer[:, lower:upper, :],
+            self.r: self.r_buffer[:, lower:upper],
+            self.s: self.s_buffer[:, lower:upper, :],
+            self.s_next: self.s_next_buffer[:, lower:upper, :],
+            self.dropout_keep_prob: kp
+        }
+        self.session.run([self.rl_train_op, self.sl_train_op], feed_dict=feed)
+    
+    def restore_buffer(self):
+        self.a_buffer = np.zeros((self.asset_number, self.buffer_size, self.a_dim))
+        self.r_buffer = np.zeros((self.asset_number, self.buffer_size))
+        self.s_buffer = np.zeros((self.asset_number, self.buffer_size, self.s_dim))
+        self.s_next_buffer = np.zeros((self.asset_number, self.buffer_size, self.s_dim))
+        self.pointer = 0
+    
+    def save_current_state(self, s):
+        if self.pointer < self.buffer_size - 1:
+            self.s_buffer[:, self.pointer, :] = s
+        else:
+            self.s_buffer[:, :-1, :] = self.s_buffer[:, 1:, :]
+            self.s_buffer[:, -1, :] = s
+    
+    def save_transition(self, a, r, s_next):
+        if self.pointer < self.buffer_size - 1:
+            self.a_buffer[:, self.pointer, :] = a
+            self.s_next_buffer[:, self.pointer, :] = s_next
+            self.r_buffer[:, self.pointer] = r
+            self.pointer += 1
+        else:
+            self.a_buffer[:, :-1, :] = self.a_buffer[:, 1:, :]
+            self.a_buffer[:, -1, :] = a
+            
+            self.r_buffer[:, :-1] = self.r_buffer[:, 1:]
+            self.r_buffer[:, -1] = r
+            
+            self.s_next_buffer[:, :-1, :] = self.s_next_buffer[:, 1:, :]
+            self.s_next_buffer[:, -1, :] = s_next
+    
+    def trade(self, train=False, kp=1.0, prob=False):
+        feed = {
+            self.s: self.s_buffer,
+            self.dropout_keep_prob: kp
+        }
+        a_prob = self.session.run(self.a_out, feed_dict=feed)[:, self.pointer, :]
+        action = []
+        if train:
+            for ap in a_prob:
+                if prob:
+                    action.append(np.clip(np.random.normal(ap, 0.5), 0, 1))
+                else:
+                    a_indices = np.arange(ap.shape[0])
+                    target_index = np.random.choice(a_indices, p=ap)
+                    a = np.zeros(ap.shape[0])
+                    a[target_index] = 1.0
+                    action.append(a)
+            return np.array(action)
+        else:
+            if prob:
+                return a_prob
+            action = []
+            for ap in a_prob:
+                target_index = np.argmax(ap)
+                a = np.zeros(ap.shape[0])
+                a[target_index] = 1.0
+                action.append(a)
+            return np.array(action)
+    
+    def load_model(self, model_path='./RPGModel'):
+        self.saver.restore(self.session, model_path + '/model')
+    
+    def save_model(self, model_path='./RPGModel'):
+        if not os.path.exists(model_path):
+            os.mkdir(model_path)
+        model_file = model_path + '/model'
+        self.saver.save(self.session, model_file)
