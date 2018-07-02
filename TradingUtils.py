@@ -117,7 +117,7 @@ def order_percent(target_percent, symbol='kanbtc', asset='kan', order_type='limi
 def re_balance(target_percent, symbol, asset, portfolio, base_currency, order_type='limit', price_discount=0, amount_discount=0.05, debug=True, max_asset_percent=1.0):
     portfolio = portfolio + [base_currency]
     current_order_info = orders_list(symbol=symbol, states='submitted')['data']
-    print('current order info', current_order_info)
+    # print('current order info', current_order_info)
     if len(current_order_info) > 0:
         for order in current_order_info:
             order_id = order['id']

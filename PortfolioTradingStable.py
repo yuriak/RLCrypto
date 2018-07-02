@@ -161,13 +161,12 @@ def real_trade(asset_data_, portfolio_, normalize_length=NORMALIZE_LENGTH, batch
     model = RPG_Portfolio_Stable(action_size=2, feature_number=asset_data_.shape[2])
     model.load_model(model_path=model_path)
     back_test(asset_data_, model=model)
-    for t in range(asset_data_.shape[0] - batch_size, asset_data_.shape[0]):
+    for t in range(asset_data_.shape[1] - batch_size, asset_data_.shape[0]):
         data = asset_data_[:, t - normalize_length + 1:t + 1, :].values
         state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
         model.save_current_state(s=state)
     action_ = model.trade(train=False, kp=1.0, prob=False)[:, 0]
     print('predict action', action_, 'for portfolio', portfolio_)
-    transaction_result = []
     for i in range(asset_data_.shape[0]):
         target_percent = action_[i]
         asset_ = portfolio_[i][0]
@@ -176,7 +175,7 @@ def real_trade(asset_data_, portfolio_, normalize_length=NORMALIZE_LENGTH, batch
             result = re_balance(target_percent,
                                 symbol=asset_ + BASE_CURRENCY,
                                 asset=asset_,
-                                portfolio=portfolio_,
+                                portfolio=lmap(lambda x: x[0], portfolio_),
                                 base_currency=BASE_CURRENCY,
                                 order_type=BUY_ORDER_TYPE,
                                 price_discount=PRICE_DISCOUNT,
@@ -187,7 +186,7 @@ def real_trade(asset_data_, portfolio_, normalize_length=NORMALIZE_LENGTH, batch
             result = re_balance(target_percent,
                                 symbol=asset_ + BASE_CURRENCY,
                                 asset=asset_,
-                                portfolio=portfolio_,
+                                portfolio=lmap(lambda x: x[0], portfolio_),
                                 base_currency=BASE_CURRENCY,
                                 order_type=SELL_ORDER_TYPE,
                                 price_discount=PRICE_DISCOUNT,
@@ -195,8 +194,7 @@ def real_trade(asset_data_, portfolio_, normalize_length=NORMALIZE_LENGTH, batch
                                 debug=debug,
                                 max_asset_percent=max_asset_percent)
         print(result)
-        transaction_result.append(result)
-        return dict(zip(lmap(lambda x: x[0], portfolio_), action_))
+    return dict(zip(lmap(lambda x: x[0], portfolio_), action_))
 
 
 if __name__ == '__main__':
@@ -247,10 +245,9 @@ if __name__ == '__main__':
             sys.exit(1)
         with open(CONFIG_FILE, 'r+') as cf:
             portfolio = json.loads(cf.read())
-        for asset, _ in portfolio:
-            if not os.path.exists(MODEL_PATH + '_' + asset):
-                print(asset, 'model not exist, please create model first')
-                sys.exit(1)
+        if not os.path.exists(MODEL_PATH):
+            print('model doesn\'t exist, please create model first')
+            sys.exit(1)
         asset_data = klines(lmap(lambda x: x[0], portfolio), interval=TRADING_TICK_INTERVAL, count=BAR_COUNT)
         asset_data = default_pre_process(asset_data)
         # warning!!! set debug=False will lose all your money @_@
