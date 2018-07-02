@@ -156,7 +156,7 @@ def back_test(asset_data_, model, test_length=TEST_LENGTH, batch_size=TEST_BATCH
     return np.sum(np.mean(test_reward, axis=1))
 
 
-def real_trade(asset_data_, asset_, max_asset_percent, portfolio_, normalize_length=NORMALIZE_LENGTH, batch_size=TEST_BATCH_SIZE, debug=DEBUG_MODE, model_path=MODEL_PATH):
+def real_trade(asset_data_, portfolio_, normalize_length=NORMALIZE_LENGTH, batch_size=TEST_BATCH_SIZE, debug=DEBUG_MODE, model_path=MODEL_PATH):
     print('start to retrieve model from ', model_path)
     model = RPG_Portfolio_Stable(action_size=2, feature_number=asset_data_.shape[2])
     model.load_model(model_path=model_path)
@@ -166,37 +166,43 @@ def real_trade(asset_data_, asset_, max_asset_percent, portfolio_, normalize_len
         state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
         model.save_current_state(s=state)
     action_ = model.trade(train=False, kp=1.0, prob=False)[:, 0]
-    print('predict action', action_, 'for asset', asset_)
-    if action_ > 0:
-        result = re_balance(action_,
-                            symbol=asset_ + BASE_CURRENCY,
-                            asset=asset_,
-                            portfolio=portfolio_,
-                            base_currency=BASE_CURRENCY,
-                            order_type=BUY_ORDER_TYPE,
-                            price_discount=PRICE_DISCOUNT,
-                            amount_discount=AMOUNT_DISCOUNT,
-                            debug=debug,
-                            max_asset_percent=max_asset_percent)
+    print('predict action', action_, 'for portfolio', portfolio_)
+    transaction_result = []
+    for i in range(asset_data_.shape[0]):
+        target_percent = action_[i]
+        asset_ = portfolio_[i][0]
+        max_asset_percent = portfolio_[i][1]
+        if target_percent > 0:
+            result = re_balance(target_percent,
+                                symbol=asset_ + BASE_CURRENCY,
+                                asset=asset_,
+                                portfolio=portfolio_,
+                                base_currency=BASE_CURRENCY,
+                                order_type=BUY_ORDER_TYPE,
+                                price_discount=PRICE_DISCOUNT,
+                                amount_discount=AMOUNT_DISCOUNT,
+                                debug=debug,
+                                max_asset_percent=max_asset_percent)
+        else:
+            result = re_balance(target_percent,
+                                symbol=asset_ + BASE_CURRENCY,
+                                asset=asset_,
+                                portfolio=portfolio_,
+                                base_currency=BASE_CURRENCY,
+                                order_type=SELL_ORDER_TYPE,
+                                price_discount=PRICE_DISCOUNT,
+                                amount_discount=AMOUNT_DISCOUNT,
+                                debug=debug,
+                                max_asset_percent=max_asset_percent)
         print(result)
-    else:
-        result = re_balance(action_,
-                            symbol=asset_ + BASE_CURRENCY,
-                            asset=asset_,
-                            portfolio=portfolio_,
-                            base_currency=BASE_CURRENCY,
-                            order_type=SELL_ORDER_TYPE,
-                            price_discount=PRICE_DISCOUNT,
-                            amount_discount=AMOUNT_DISCOUNT,
-                            debug=debug,
-                            max_asset_percent=max_asset_percent)
-        print(result)
-        return action_
+        transaction_result.append(result)
+        return dict(zip(lmap(lambda x: x[0], portfolio_), action_))
 
 
 if __name__ == '__main__':
     mode = sys.argv[1]
     if mode == 'select':
+        print('=' * 100)
         if os.path.exists(CONFIG_FILE):
             portfolio = json.loads(open(CONFIG_FILE, 'r+').read())
             for asset, weight in portfolio:
@@ -221,6 +227,7 @@ if __name__ == '__main__':
             cf.write(json.dumps(portfolio))
             print('writing selected assets...')
     elif mode == 'create_model':
+        print('=' * 100)
         if not os.path.exists(CONFIG_FILE):
             print('config file not exist, please select coins first')
             sys.exit(1)
@@ -232,11 +239,9 @@ if __name__ == '__main__':
         asset_data = klines(lmap(lambda x: x[0], portfolio), interval=TRADING_TICK_INTERVAL, count=BAR_COUNT)
         asset_data = default_pre_process(asset_data)
         print('start to create new model')
-        for asset, _ in portfolio:
-            print('creating new model for', asset)
-            create_new_model(data=asset_data[asset, :, :], model_path=MODEL_PATH + '_' + asset)
+        create_new_model(asset_data_=asset_data)
     elif mode == 'trade':
-        print('=' * 128)
+        print('=' * 100)
         if not os.path.exists(CONFIG_FILE):
             print('config file not exist, please select coins first')
             sys.exit(1)
@@ -251,17 +256,7 @@ if __name__ == '__main__':
         # warning!!! set debug=False will lose all your money @_@
         print('start to trade:', portfolio)
         with open(LOG_FILE, 'a+') as f:
-            trade_action = {}
-            for asset, weight in portfolio:
-                action = real_trade(data=asset_data[asset, :, :],
-                                    asset_=asset,
-                                    max_asset_percent=weight,
-                                    portfolio_=lmap(lambda x: x[0], portfolio),
-                                    normalize_length=NORMALIZE_LENGTH,
-                                    batch_size=TEST_BATCH_SIZE,
-                                    debug=DEBUG_MODE,
-                                    model_path=MODEL_PATH + '_' + asset)
-                trade_action[asset] = action
+            trade_action=real_trade(asset_data_=asset_data,portfolio_=portfolio)
             f.write('{0},{1}\n'.format(int(asset_data[:, :, 'diff'].index[-1].timestamp()), str(trade_action)))
     elif mode == 'sc':
         if os.path.exists(CONFIG_FILE):
@@ -298,6 +293,4 @@ if __name__ == '__main__':
         asset_data = klines(lmap(lambda x: x[0], portfolio), interval=TRADING_TICK_INTERVAL, count=BAR_COUNT)
         asset_data = default_pre_process(asset_data)
         print('start to create new model')
-        for asset, _ in portfolio:
-            print('creating new model for', asset)
-            create_new_model(data=asset_data[asset, :, :], model_path=MODEL_PATH + '_' + asset)
+        create_new_model(asset_data_=asset_data)
