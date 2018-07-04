@@ -193,7 +193,7 @@ def real_trade(asset_data_, portfolio_, normalize_length=NORMALIZE_LENGTH, batch
                                 amount_discount=AMOUNT_DISCOUNT,
                                 debug=debug,
                                 max_asset_percent=max_asset_percent)
-        print(result)
+        print(result, target_percent)
     return dict(zip(lmap(lambda x: x[0], portfolio_), action_))
 
 
