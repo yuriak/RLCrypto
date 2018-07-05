@@ -760,8 +760,8 @@ class DDRPG(object):
                  gamma=0.99,
                  actor_rnn_units=128,
                  critic_rnn_units=128,
-                 actor_dnn_units=[64, 32],
-                 critic_dnn_units=[64, 32],
+                 actor_dnn_units=[64],
+                 critic_dnn_units=[64],
                  learning_rate_a=1e-3,
                  learning_rate_c=2e-3):
         tf.reset_default_graph()
@@ -791,7 +791,6 @@ class DDRPG(object):
         self.s_next = tf.placeholder(tf.float32, [None, None, self.s_dim], 's_next')
         self.r = tf.placeholder(tf.float32, [None, None, 1], 'r')
         self.keep_prob = tf.placeholder(tf.float32, [], 'dropout')
-        
         #         with tf.variable_scope('actor', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
         with tf.variable_scope('actor', initializer=tf.truncated_normal_initializer(dtype=tf.float32, mean=0, stddev=1)):
             self.a = self._build_a(s=self.s,
@@ -846,22 +845,23 @@ class DDRPG(object):
         self.sess.run(tf.global_variables_initializer())
     
     def trade(self, train=False, kp=1.0, epsilon=0.9):
-        action = self.sess.run(self.a, {self.s: self.s_buffer[:], self.keep_prob: kp})[:, self.pointer, :].flatten()
+        start_point = self.pointer + 1 - self.batch_size
+        action = self.sess.run(self.a, {self.s: self.s_buffer[:, 0 if start_point < 0 else start_point:self.pointer + 1, :], self.keep_prob: kp})[:, -1, :].flatten()
         if train:
             if np.random.rand() < epsilon:
-                return action
-            action = np.clip(np.random.normal(action, scale=(1 - action)), 0, 1)
+                return np.exp(action / self.softmax_tau) / np.sum(np.exp(action / self.softmax_tau))
+            action = np.random.normal(action, scale=(1 - action))
             action = np.exp(action / self.softmax_tau) / np.sum(np.exp(action / self.softmax_tau))
             return action
         else:
-            return action
+            return np.exp(action / self.softmax_tau) / np.sum(np.exp(action / self.softmax_tau))
     
     def train(self, kp=0.85):
         if self.pointer < self.batch_size:
             return
-        sample_start=np.random.randint(0, self.pointer - self.batch_size+1)
+        sample_start = np.random.randint(0, self.pointer - self.batch_size + 1)
         self.sess.run(self.soft_replace)
-        self.sess.run(self.a_train, {self.s: self.s_buffer[:,sample_start:sample_start+self.batch_size],
+        self.sess.run(self.a_train, {self.s: self.s_buffer[:, sample_start:sample_start + self.batch_size],
                                      self.keep_prob: kp})
         self.sess.run(self.c_train, {self.s: self.s_buffer[:, sample_start:sample_start + self.batch_size],
                                      self.a: self.a_buffer[:, sample_start:sample_start + self.batch_size],
@@ -870,27 +870,15 @@ class DDRPG(object):
                                      self.keep_prob: kp})
     
     def save_current_state(self, s):
-        if self.pointer < self.buffer_size - 1:
-            self.s_buffer[:, self.pointer, :] = s
-        else:
-            self.s_buffer[:, :-1, :] = self.s_buffer[:, 1:, :]
-            self.s_buffer[:, -1, :] = s
+        self.s_buffer[:, self.pointer, :] = s
     
     def save_transition(self, a, r, s_next):
-        if self.pointer < self.buffer_size - 1:
-            self.a_buffer[:, self.pointer, :] = a[:, None]
-            self.s_next_buffer[:, self.pointer, :] = s_next
-            self.r_buffer[:, self.pointer, :] = r[:, None]
-            self.pointer += 1
-        else:
-            self.a_buffer[:, :-1, :] = self.a_buffer[:, 1:, :]
-            self.a_buffer[:, -1, :] = a[:, None]
-            
-            self.r_buffer[:, :-1, :] = self.r_buffer[:, 1:, :]
-            self.r_buffer[:, -1, :] = r[:, None]
-            
-            self.s_next_buffer[:, :-1, :] = self.s_next_buffer[:, 1:, :]
-            self.s_next_buffer[:, -1, :] = s_next
+        self.a_buffer[:, self.pointer, :] = a[:, None]
+        self.s_next_buffer[:, self.pointer, :] = s_next
+        self.r_buffer[:, self.pointer, :] = r[:, None]
+    
+    def settle(self):
+        self.pointer += 1
     
     def restore_buffer(self):
         self.s_buffer = np.zeros((self.asset_number, self.buffer_size, self.s_dim))
@@ -903,17 +891,18 @@ class DDRPG(object):
         with tf.variable_scope(scope):
             cell = self._add_GRU(units_number=rnn_units, activation=tf.nn.tanh, keep_prob=keep_prob, trainable=trainable)
             out, _ = tf.nn.dynamic_rnn(inputs=s, cell=cell, dtype=tf.float32)
-            out = self._add_dense_layer(inputs=out, output_shape=dnn_units + [1], activations=([tf.nn.relu] * (len(dnn_units)) + [None]), drop_keep_prob=keep_prob, trainable=trainable)
-            out = tf.nn.softmax(out, axis=0)
+            out = self._add_dense_layer(inputs=out, output_shape=dnn_units + [1], activations=([tf.nn.relu] * (len(dnn_units)) + [tf.nn.sigmoid]), drop_keep_prob=keep_prob, trainable=trainable)
+            #             out = out / self.softmax_tau
+            #             out = tf.nn.softmax(out, axis=0)
             return out
     
     def _build_c(self, s, a, rnn_units, dnn_units, scope, keep_prob, trainable):
         with tf.variable_scope(scope):
             rnn_input = tf.concat([s, a], axis=-1)
             cell = self._add_GRU(units_number=rnn_units, activation=tf.nn.tanh, keep_prob=keep_prob, trainable=trainable)
-            out, _ = tf.nn.dynamic_rnn(inputs=s, cell=cell, dtype=tf.float32, scope=scope + '/s')
-            out = self._add_dense_layer(inputs=rnn_input, output_shape=dnn_units, activations=[tf.nn.relu] * len(dnn_units), drop_keep_prob=keep_prob, trainable=trainable)
-            q = self._add_dense_layer(inputs=out, output_shape=[1], activations=[None], drop_keep_prob=keep_prob, trainable=trainable)
+            out, _ = tf.nn.dynamic_rnn(inputs=rnn_input, cell=cell, dtype=tf.float32)
+            out = self._add_dense_layer(inputs=out, output_shape=dnn_units, activations=[tf.nn.relu] * len(dnn_units), drop_keep_prob=keep_prob, trainable=trainable)
+            q = self._add_dense_layer(inputs=out, output_shape=[1], activations=[tf.nn.tanh], drop_keep_prob=keep_prob, trainable=trainable)
             return q
     
     def _add_GRU(self, units_number, activation=tf.nn.relu, keep_prob=1.0, trainable=True):

@@ -2,5 +2,5 @@
 while true
 do
 python3 PortfolioTrading.py trade
-sleep 900
+sleep 3600
 done
