@@ -2,32 +2,41 @@
 import tensorflow as tf
 import numpy as np
 import os
+from models.layers import *
 
-class RPG_CryptoNG_ShareV(object):
-    def __init__(self, feature_number, action_size=1, hidden_units_number=[128, 64], learning_rate=0.001):
+
+class RecurrentPolicyGradient(object):
+    def __init__(self, s_dim, a_dim=1, hidden_units_number=[128, 64], learning_rate=0.001):
         tf.reset_default_graph()
-        self.s = tf.placeholder(dtype=tf.float32, shape=[None, None, feature_number], name='s')
-        self.a = tf.placeholder(dtype=tf.int32, shape=[None, None, action_size], name='a')
+        self.s = tf.placeholder(dtype=tf.float32, shape=[None, None, s_dim], name='s')
+        self.a = tf.placeholder(dtype=tf.int32, shape=[None, None, a_dim], name='a')
         self.r = tf.placeholder(dtype=tf.float32, shape=[None, None], name='r')
-        self.s_next = tf.placeholder(dtype=tf.float32, shape=[None, None, feature_number], name='s_next')
-        self.action_size = action_size
+        self.s_next = tf.placeholder(dtype=tf.float32, shape=[None, None, s_dim], name='s_next')
+        self.a_dim = a_dim
+        self.s_dim = s_dim
         self.a_buffer = []
         self.r_buffer = []
         self.s_buffer = []
         self.s_next_buffer = []
         self.dropout_keep_prob = tf.placeholder(dtype=tf.float32, shape=[], name='dropout_keep_prob')
         with tf.variable_scope('rnn_encoder', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
-            cell = self._add_GRUs(units_number=[128] * 2, activation=[tf.nn.tanh] * 2, keep_prob=self.dropout_keep_prob)
-            self.rnn_output, _ = tf.nn.dynamic_rnn(inputs=self.s, cell=cell, dtype=tf.float32)
+            cells = add_GRUs(units_numbers=[128] * 2, acts=[tf.nn.tanh] * 2, kp=self.dropout_keep_prob)
+            self.rnn_output, _ = tf.nn.dynamic_rnn(inputs=self.s, cell=cells, dtype=tf.float32)
         
         with tf.variable_scope('supervised', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
-            self.state_predict = self._add_dense_layer(inputs=self.rnn_output, output_shape=hidden_units_number, drop_keep_prob=self.dropout_keep_prob, act=tf.nn.relu, use_bias=True)
-            self.state_predict = self._add_dense_layer(inputs=self.rnn_output, output_shape=[feature_number], drop_keep_prob=self.dropout_keep_prob, act=None, use_bias=True)
+            self.state_predict = add_dense(inputs=self.rnn_output,
+                                           units_numbers=hidden_units_number + [self.s_dim],
+                                           acts=([tf.nn.relu] * len(hidden_units_number) + [None]),
+                                           kp=self.dropout_keep_prob,
+                                           use_bias=True)
             self.state_loss = tf.losses.mean_squared_error(self.state_predict, self.s_next)
         
         with tf.variable_scope('policy_gradient', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
-            self.a_prob = self._add_dense_layer(inputs=self.rnn_output, output_shape=hidden_units_number, drop_keep_prob=self.dropout_keep_prob, act=tf.nn.relu, use_bias=True)
-            self.a_prob = self._add_dense_layer(inputs=self.a_prob, output_shape=[action_size], drop_keep_prob=self.dropout_keep_prob, act=None, use_bias=True)
+            self.a_prob = add_dense(inputs=self.rnn_output,
+                                    units_numbers=(hidden_units_number + [self.a_dim]),
+                                    acts=([tf.nn.relu] * len(hidden_units_number) + [None]),
+                                    kp=self.dropout_keep_prob,
+                                    use_bias=True)
             self.a_out = tf.nn.softmax(self.a_prob, axis=-1)
             self.negative_cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.a_prob, labels=self.a)
         
@@ -45,32 +54,13 @@ class RPG_CryptoNG_ShareV(object):
     def init_model(self):
         self.session.run(self.init_op)
     
-    def _add_dense_layer(self, inputs, output_shape, drop_keep_prob, act=tf.nn.relu, use_bias=True):
-        output = inputs
-        for n in output_shape:
-            output = tf.layers.dense(output, n, activation=act, use_bias=use_bias)
-            output = tf.nn.dropout(output, drop_keep_prob)
-        return output
-    
-    def _add_GRU(self, units_number, activation=tf.nn.relu, keep_prob=1.0):
-        cell = tf.contrib.rnn.GRUCell(units_number, activation=activation)
-        cell = tf.contrib.rnn.DropoutWrapper(cell, input_keep_prob=keep_prob)
-        return cell
-    
-    def _add_GRUs(self, units_number, activation, keep_prob=1.0):
-        cells = tf.contrib.rnn.MultiRNNCell(cells=[self._add_GRU(units_number=n, activation=a) for n, a in zip(units_number, activation)])
-        return cells
-    
-    def _add_gru_cell(self, units_number, activation=tf.nn.relu):
-        return tf.contrib.rnn.GRUCell(num_units=units_number, activation=activation)
-    
-    def train(self, drop=0.85):
+    def train(self, kp=0.85):
         feed = {
             self.a: np.transpose(np.array(self.a_buffer), axes=[1, 0, 2]),
             self.r: np.transpose(np.array(self.r_buffer), axes=[1, 0]),
             self.s: np.transpose(np.array(self.s_buffer), axes=[1, 0, 2]),
             self.s_next: np.transpose(np.array(self.s_next_buffer), axes=[1, 0, 2]),
-            self.dropout_keep_prob: drop
+            self.dropout_keep_prob: kp
         }
         self.session.run([self.rl_train_op, self.sl_train_op], feed_dict=feed)
     
@@ -83,22 +73,23 @@ class RPG_CryptoNG_ShareV(object):
     def save_current_state(self, s):
         self.s_buffer.append(s)
     
-    def save_transation(self, a, r, s_next):
+    def save_transition(self, a, r, s_next):
         self.a_buffer.append(a)
         self.r_buffer.append(r)
         self.s_next_buffer.append(s_next)
     
-    def trade(self, train=False, drop=1.0, prob=False):
+    def trade(self, train=False, kp=1.0, prob=False):
         feed = {
             self.s: np.transpose(np.array(self.s_buffer), axes=[1, 0, 2]),
-            self.dropout_keep_prob: drop
+            self.dropout_keep_prob: kp
         }
         a_prob = self.session.run(self.a_out, feed_dict=feed)[:, -1, :]
         actions = []
         if train:
             for ap in a_prob:
                 if prob:
-                    np.clip(np.random.normal(0.5, 0.25), 0, 1)
+                    np.random.normal(loc=ap, scale=(1 - ap))
+                    actions.append(np.exp(ap) / np.sum(np.exp(ap)))
                 else:
                     a_indices = np.arange(ap.shape[0])
                     target_index = np.random.choice(a_indices, p=ap)
@@ -125,3 +116,125 @@ class RPG_CryptoNG_ShareV(object):
             os.mkdir(model_path)
         model_file = model_path + '/model'
         self.saver.save(self.session, model_file)
+    
+    @staticmethod
+    def create_new_model(asset_data_,
+                         c,
+                         normalize_length,
+                         batch_size,
+                         train_length,
+                         max_epoch,
+                         learning_rate,
+                         pass_threshold,
+                         model_path):
+        current_model_reward = -np.inf
+        model = None
+        while current_model_reward < pass_threshold:
+            model = RecurrentPolicyGradient(s_dim=asset_data_.shape[2], a_dim=2, learning_rate=learning_rate)
+            model.init_model()
+            model.restore_buffer()
+            train_mean_r = []
+            test_mean_r = []
+            for e in range(max_epoch):
+                test_reward = []
+                test_actions = []
+                train_reward = []
+                previous_action = np.zeros(asset_data_.shape[0])
+                for t in range(normalize_length, train_length):
+                    data = asset_data_[:, t - normalize_length:t, :].values
+                    state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
+                    data = asset_data_[:, t - normalize_length + 1:t + 1, :].values
+                    next_state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
+                    model.save_current_state(s=state)
+                    action_ = model.trade(train=True, kp=1.0, prob=False)
+                    r = asset_data_[:, :, 'diff'].iloc[t].values * action_[:, 0] - c * np.abs(previous_action - action_[:, 0])
+                    model.save_transition(a=action_, r=r, s_next=next_state)
+                    previous_action = action_[:, 0]
+                    train_reward.append(r)
+                    if t % batch_size == 0:
+                        model.train(kp=0.8)
+                        model.restore_buffer()
+                model.restore_buffer()
+                print(e, 'train_reward', np.sum(np.mean(train_reward, axis=1)), np.mean(train_reward))
+                train_mean_r.append(np.mean(train_reward))
+                previous_action = np.zeros(asset_data_.shape[0])
+                for t in range(train_length, asset_data_.shape[1]):
+                    data = asset_data_[:, t - normalize_length:t, :].values
+                    state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
+                    model.save_current_state(s=state)
+                    action_ = model.trade(train=False, kp=1.0, prob=False)
+                    r = asset_data_[:, :, 'diff'].iloc[t].values * action_[:, 0] - c * np.abs(previous_action - action_[:, 0])
+                    test_reward.append(r)
+                    test_actions.append(action_)
+                    previous_action = action_[:, 0]
+                    if t % batch_size == 0:
+                        model.restore_buffer()
+                print(e, 'test_reward', np.sum(np.mean(test_reward, axis=1)), np.mean(test_reward))
+                test_mean_r.append(np.mean(test_reward))
+                model.restore_buffer()
+                if np.sum(np.mean(test_reward, axis=1)) > pass_threshold:
+                    break
+            model.restore_buffer()
+        print('model created successfully, backtest reward:', current_model_reward)
+        model.save_model(model_path)
+        return model
+    
+    def back_test(self,
+                  asset_data_,
+                  test_length,
+                  batch_size,
+                  normalize_length,
+                  c):
+        previous_action = np.zeros(asset_data_.shape[0])
+        test_reward = []
+        test_actions = []
+        for t in range(asset_data_.shape[1] - test_length, asset_data_.shape[1]):
+            data = asset_data_[:, t - normalize_length:t, :].values
+            state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
+            self.save_current_state(s=state)
+            action_ = self.trade(train=False, kp=1.0, prob=False)
+            r = asset_data_[:, :, 'diff'].iloc[t].values * action_[:, 0] - c * np.abs(previous_action - action_[:, 0])
+            test_reward.append(r)
+            test_actions.append(action_)
+            previous_action = action_[:, 0]
+            if t % batch_size == 0:
+                self.restore_buffer()
+        self.restore_buffer()
+        print('back test_reward', np.sum(np.mean(test_reward, axis=1)))
+        return np.sum(np.mean(test_reward, axis=1))
+
+    def real_trade(self, asset_data_, normalize_length, batch_size):
+        for t in range(asset_data_.shape[1] - batch_size, asset_data_.shape[0]):
+            data = asset_data_[:, t - normalize_length + 1:t + 1, :].values
+            state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
+            self.save_current_state(s=state)
+        action_ = self.trade(train=False, kp=1.0, prob=False)[:, 0]
+        return action_
+        # for i in range(asset_data_.shape[0]):
+        #     target_percent = action_[i]
+        #     asset_ = portfolio_[i][0]
+        #     max_asset_percent = portfolio_[i][1]
+        #     if target_percent > 0:
+        #         result = re_balance(target_percent,
+        #                             symbol=asset_ + BASE_CURRENCY,
+        #                             asset=asset_,
+        #                             portfolio=lmap(lambda x: x[0], portfolio_),
+        #                             base_currency=BASE_CURRENCY,
+        #                             order_type=BUY_ORDER_TYPE,
+        #                             price_discount=PRICE_DISCOUNT,
+        #                             amount_discount=AMOUNT_DISCOUNT,
+        #                             debug=debug,
+        #                             max_asset_percent=max_asset_percent)
+        #     else:
+        #         result = re_balance(target_percent,
+        #                             symbol=asset_ + BASE_CURRENCY,
+        #                             asset=asset_,
+        #                             portfolio=lmap(lambda x: x[0], portfolio_),
+        #                             base_currency=BASE_CURRENCY,
+        #                             order_type=SELL_ORDER_TYPE,
+        #                             price_discount=PRICE_DISCOUNT,
+        #                             amount_discount=AMOUNT_DISCOUNT,
+        #                             debug=debug,
+        #                             max_asset_percent=max_asset_percent)
+        #     print(result)
+        return dict(zip(lmap(lambda x: x[0], portfolio_), action_))

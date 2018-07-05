@@ -118,12 +118,10 @@ def re_balance(target_percent, symbol, asset, portfolio, base_currency, order_ty
             if order_type == 'limit':
                 order = send_order(symbol=symbol, source='api', amount=target_sell_amount, _type='sell-limit', price=limit_sell_price)
                 print(order)
-                time.sleep(10)
                 return order['data']
             else:
                 order = send_order(symbol=symbol, source='api', amount=target_sell_amount, _type='sell-market')
                 print(order)
-                time.sleep(10)
                 return order['data']
         else:
             print('debugging')

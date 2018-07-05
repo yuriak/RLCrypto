@@ -17,15 +17,20 @@ import urllib.request
 import requests
 
 # 此处填写APIKEY
+ACCESS_KEY = ''
+SECRET_KEY = ''
 
-if os.path.exists('account.json'):
-    with open('account.json','r+') as f:
-        account_info=json.loads(f.read())
-        ACCESS_KEY = account_info['ACCESS_KEY']
-        SECRET_KEY = account_info['SECRET_KEY']
-else:
-    ACCESS_KEY = ''
-    SECRET_KEY = ''
+
+def init_account(account_file_path):
+    if os.path.exists(account_file_path):
+        with open('account.json', 'r+') as f:
+            account_info = json.loads(f.read())
+            access_key = account_info['ACCESS_KEY']
+            secret_key = account_info['SECRET_KEY']
+            return access_key, secret_key
+    else:
+        return '',''
+
 
 # API 请求地址
 MARKET_URL = "https://api.huobi.pro"
@@ -122,6 +127,3 @@ def createSign(pParams, method, host_url, request_path, secret_key):
     signature = base64.b64encode(digest)
     signature = signature.decode()
     return signature
-
-
-
