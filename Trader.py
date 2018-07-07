@@ -11,6 +11,7 @@ MODEL_PATH = './model_backup/PolicyGradient'
 ACCOUNT_CONFIG_FILE = './config/account.json'
 LOG_FILE = './log/portfolio_log.csv'
 PORTFOLIO_CONFIG = './config/portfolio_config.json'
+TRADE_CONFIG = './config/trade_config.json'
 ACCESS_KEY, SECRET_KEY = init_account(ACCOUNT_CONFIG_FILE)
 
 with open(MODEL_TYPE_CONFIG, 'r') as f:
@@ -39,10 +40,12 @@ TRADING_TICK_INTERVAL = '60min'
 BAR_COUNT = 2000
 AMOUNT_DISCOUNT = 0.02
 PRICE_DISCOUNT = -5e-3
-DEBUG_MODE = True
 BUY_ORDER_TYPE = 'limit'
 SELL_ORDER_TYPE = 'limit'
-BASE_CURRENCY = 'btc'
+with open(TRADE_CONFIG, 'r') as f:
+    trade_config = json.loads(f.read())
+    BASE_CURRENCY = trade_config['base_currency']
+    DEBUG_MODE = trade_config['debug_mode']
 
 
 class Trader(object):
