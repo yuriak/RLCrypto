@@ -51,8 +51,8 @@ with open(TRADE_CONFIG, 'r') as f:
 class Trader(object):
     def __init__(self):
         self.portfolio = []
-        self.asset_data: pd.Panel = None
-        self.model: Model = None
+        self.asset_data = None
+        self.model = None
     
     def init_portfolio(self, portfolio_config):
         if not os.path.exists(portfolio_config):
