@@ -145,7 +145,7 @@ def back_test(asset_data_, model, test_length=TEST_LENGTH, batch_size=TEST_BATCH
         data = asset_data_[:, t - normalize_length:t, :].values
         state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
         model.save_current_state(s=state)
-        action_ = model.trade(train=False, kp=1.0, prob=False)
+        action_ = model._trade(train=False, kp=1.0, prob=False)
         r = asset_data_[:, :, 'diff'].iloc[t].values * action_[:, 0] - c * np.abs(previous_action - action_[:, 0])
         test_reward.append(r)
         test_actions.append(action_)

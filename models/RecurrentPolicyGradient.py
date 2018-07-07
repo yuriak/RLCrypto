@@ -2,11 +2,13 @@
 import tensorflow as tf
 import numpy as np
 import os
+from models.Model import Model
 from models.layers import *
 
 
-class RecurrentPolicyGradient(object):
-    def __init__(self, s_dim, a_dim=1, hidden_units_number=[128, 64], learning_rate=0.001):
+class RecurrentPolicyGradient(Model):
+    def __init__(self, s_dim, a_dim=2, hidden_units_number=[128, 64], learning_rate=0.001, batch_size=64, normalize_length=10):
+        super(RecurrentPolicyGradient, self).__init__()
         tf.reset_default_graph()
         self.s = tf.placeholder(dtype=tf.float32, shape=[None, None, s_dim], name='s')
         self.a = tf.placeholder(dtype=tf.int32, shape=[None, None, a_dim], name='a')
@@ -14,6 +16,8 @@ class RecurrentPolicyGradient(object):
         self.s_next = tf.placeholder(dtype=tf.float32, shape=[None, None, s_dim], name='s_next')
         self.a_dim = a_dim
         self.s_dim = s_dim
+        self.batch_size = batch_size
+        self.normalize_length = normalize_length
         self.a_buffer = []
         self.r_buffer = []
         self.s_buffer = []
@@ -78,7 +82,7 @@ class RecurrentPolicyGradient(object):
         self.r_buffer.append(r)
         self.s_next_buffer.append(s_next)
     
-    def trade(self, train=False, kp=1.0, prob=False):
+    def _trade(self, train=False, kp=1.0, prob=False):
         feed = {
             self.s: np.transpose(np.array(self.s_buffer), axes=[1, 0, 2]),
             self.dropout_keep_prob: kp
@@ -130,7 +134,11 @@ class RecurrentPolicyGradient(object):
         current_model_reward = -np.inf
         model = None
         while current_model_reward < pass_threshold:
-            model = RecurrentPolicyGradient(s_dim=asset_data_.shape[2], a_dim=2, learning_rate=learning_rate)
+            model = RecurrentPolicyGradient(s_dim=asset_data_.shape[2],
+                                            a_dim=2,
+                                            learning_rate=learning_rate,
+                                            batch_size=batch_size,
+                                            normalize_length=normalize_length)
             model.init_model()
             model.restore_buffer()
             train_mean_r = []
@@ -140,18 +148,18 @@ class RecurrentPolicyGradient(object):
                 test_actions = []
                 train_reward = []
                 previous_action = np.zeros(asset_data_.shape[0])
-                for t in range(normalize_length, train_length):
-                    data = asset_data_[:, t - normalize_length:t, :].values
+                for t in range(model.normalize_length, train_length):
+                    data = asset_data_[:, t - model.normalize_length:t, :].values
                     state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
-                    data = asset_data_[:, t - normalize_length + 1:t + 1, :].values
+                    data = asset_data_[:, t - model.normalize_length + 1:t + 1, :].values
                     next_state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
                     model.save_current_state(s=state)
-                    action_ = model.trade(train=True, kp=1.0, prob=False)
+                    action_ = model._trade(train=True, kp=1.0, prob=False)
                     r = asset_data_[:, :, 'diff'].iloc[t].values * action_[:, 0] - c * np.abs(previous_action - action_[:, 0])
                     model.save_transition(a=action_, r=r, s_next=next_state)
                     previous_action = action_[:, 0]
                     train_reward.append(r)
-                    if t % batch_size == 0:
+                    if t % model.batch_size == 0:
                         model.train(kp=0.8)
                         model.restore_buffer()
                 model.restore_buffer()
@@ -159,15 +167,15 @@ class RecurrentPolicyGradient(object):
                 train_mean_r.append(np.mean(train_reward))
                 previous_action = np.zeros(asset_data_.shape[0])
                 for t in range(train_length, asset_data_.shape[1]):
-                    data = asset_data_[:, t - normalize_length:t, :].values
+                    data = asset_data_[:, t - model.normalize_length:t, :].values
                     state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
                     model.save_current_state(s=state)
-                    action_ = model.trade(train=False, kp=1.0, prob=False)
+                    action_ = model._trade(train=False, kp=1.0, prob=False)
                     r = asset_data_[:, :, 'diff'].iloc[t].values * action_[:, 0] - c * np.abs(previous_action - action_[:, 0])
                     test_reward.append(r)
                     test_actions.append(action_)
                     previous_action = action_[:, 0]
-                    if t % batch_size == 0:
+                    if t % model.batch_size == 0:
                         model.restore_buffer()
                 print(e, 'test_reward', np.sum(np.mean(test_reward, axis=1)), np.mean(test_reward))
                 test_mean_r.append(np.mean(test_reward))
@@ -179,62 +187,29 @@ class RecurrentPolicyGradient(object):
         model.save_model(model_path)
         return model
     
-    def back_test(self,
-                  asset_data_,
-                  test_length,
-                  batch_size,
-                  normalize_length,
-                  c):
+    def back_test(self, asset_data_, c, test_length):
         previous_action = np.zeros(asset_data_.shape[0])
         test_reward = []
         test_actions = []
         for t in range(asset_data_.shape[1] - test_length, asset_data_.shape[1]):
-            data = asset_data_[:, t - normalize_length:t, :].values
+            data = asset_data_[:, t - self.normalize_length:t, :].values
             state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
             self.save_current_state(s=state)
-            action_ = self.trade(train=False, kp=1.0, prob=False)
+            action_ = self._trade(train=False, kp=1.0, prob=False)
             r = asset_data_[:, :, 'diff'].iloc[t].values * action_[:, 0] - c * np.abs(previous_action - action_[:, 0])
             test_reward.append(r)
             test_actions.append(action_)
             previous_action = action_[:, 0]
-            if t % batch_size == 0:
+            if t % self.batch_size == 0:
                 self.restore_buffer()
         self.restore_buffer()
         print('back test_reward', np.sum(np.mean(test_reward, axis=1)))
         return np.sum(np.mean(test_reward, axis=1))
-
-    def real_trade(self, asset_data_, normalize_length, batch_size):
-        for t in range(asset_data_.shape[1] - batch_size, asset_data_.shape[0]):
-            data = asset_data_[:, t - normalize_length + 1:t + 1, :].values
+    
+    def trade(self, asset_data_):
+        for t in range(asset_data_.shape[1] - self.batch_size, asset_data_.shape[0]):
+            data = asset_data_[:, t - self.normalize_length + 1:t + 1, :].values
             state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
             self.save_current_state(s=state)
-        action_ = self.trade(train=False, kp=1.0, prob=False)[:, 0]
+        action_ = self._trade(train=False, kp=1.0, prob=False)[:, 0]
         return action_
-        # for i in range(asset_data_.shape[0]):
-        #     target_percent = action_[i]
-        #     asset_ = portfolio_[i][0]
-        #     max_asset_percent = portfolio_[i][1]
-        #     if target_percent > 0:
-        #         result = re_balance(target_percent,
-        #                             symbol=asset_ + BASE_CURRENCY,
-        #                             asset=asset_,
-        #                             portfolio=lmap(lambda x: x[0], portfolio_),
-        #                             base_currency=BASE_CURRENCY,
-        #                             order_type=BUY_ORDER_TYPE,
-        #                             price_discount=PRICE_DISCOUNT,
-        #                             amount_discount=AMOUNT_DISCOUNT,
-        #                             debug=debug,
-        #                             max_asset_percent=max_asset_percent)
-        #     else:
-        #         result = re_balance(target_percent,
-        #                             symbol=asset_ + BASE_CURRENCY,
-        #                             asset=asset_,
-        #                             portfolio=lmap(lambda x: x[0], portfolio_),
-        #                             base_currency=BASE_CURRENCY,
-        #                             order_type=SELL_ORDER_TYPE,
-        #                             price_discount=PRICE_DISCOUNT,
-        #                             amount_discount=AMOUNT_DISCOUNT,
-        #                             debug=debug,
-        #                             max_asset_percent=max_asset_percent)
-        #     print(result)
-        return dict(zip(lmap(lambda x: x[0], portfolio_), action_))

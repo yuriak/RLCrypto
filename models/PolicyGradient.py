@@ -2,17 +2,22 @@
 import tensorflow as tf
 import numpy as np
 import os
+from models.Model import Model
 from models.layers import *
 
 
-class PolicyGradient(object):
-    def __init__(self, s_dim, a_dim=2, hidden_units_number=[128, 128, 128, 64], learning_rate=0.001):
+class PolicyGradient(Model):
+    def __init__(self, s_dim, a_dim=2, hidden_units_number=[128, 128, 128, 64], learning_rate=0.001, batch_size=64, normalize_length=10):
+        super(PolicyGradient, self).__init__()
         tf.reset_default_graph()
         self.s = tf.placeholder(dtype=tf.float32, shape=[None, None, s_dim], name='s')
         self.a = tf.placeholder(dtype=tf.int32, shape=[None, None, a_dim], name='a')
         self.r = tf.placeholder(dtype=tf.float32, shape=[None, None], name='r')
         self.a_dim = a_dim
         self.s_dim = s_dim
+        self.batch_size = batch_size
+        self.normalize_length = normalize_length
+        
         self.a_buffer = []
         self.r_buffer = []
         self.s_buffer = []
@@ -54,7 +59,7 @@ class PolicyGradient(object):
         self.r_buffer.append(r)
         self.s_buffer.append(s)
     
-    def trade(self, s, train=False, kp=1.0, prob=False):
+    def _trade(self, s, train=False, kp=1.0, prob=False):
         feed = {
             self.s: s[:, None, :],
             self.dropout_keep_prob: kp
@@ -106,7 +111,11 @@ class PolicyGradient(object):
         current_model_reward = -np.inf
         model = None
         while current_model_reward < pass_threshold:
-            model = PolicyGradient(s_dim=asset_data_.shape[2], a_dim=2, learning_rate=learning_rate)
+            model = PolicyGradient(s_dim=asset_data_.shape[2],
+                                   a_dim=2,
+                                   learning_rate=learning_rate,
+                                   batch_size=batch_size,
+                                   normalize_length=normalize_length)
             model.init_model()
             model.restore_buffer()
             train_mean_r = []
@@ -116,15 +125,15 @@ class PolicyGradient(object):
                 test_actions = []
                 train_reward = []
                 previous_action = np.zeros(asset_data_.shape[0])
-                for t in range(normalize_length, train_length):
-                    data = asset_data_[:, t - normalize_length:t, :].values
+                for t in range(model.normalize_length, train_length):
+                    data = asset_data_[:, t - model.normalize_length:t, :].values
                     state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
-                    action = model.trade(state, train=True, prob=False, kp=1.0)
+                    action = model._trade(state, train=True, prob=False, kp=1.0)
                     r = asset_data_[:, :, 'diff'].iloc[t].values * action[:, 0] - c * np.abs(previous_action - action[:, 0])
                     model.save_transation(a=action, s=state, r=r)
                     previous_action = action[:, 0]
                     train_reward.append(r)
-                    if t % batch_size == 0:
+                    if t % model.batch_size == 0:
                         model.train(kp=0.8)
                         model.restore_buffer()
                 model.restore_buffer()
@@ -132,9 +141,9 @@ class PolicyGradient(object):
                 train_mean_r.append(np.mean(train_reward))
                 previous_action = np.zeros(asset_data_.shape[0])
                 for t in range(train_length, asset_data_.shape[1]):
-                    data = asset_data_[:, t - normalize_length:t, :].values
+                    data = asset_data_[:, t - model.normalize_length:t, :].values
                     state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
-                    action = model.trade(state, train=True, prob=False, kp=1.0)
+                    action = model._trade(state, train=True, prob=False, kp=1.0)
                     r = asset_data_[:, :, 'diff'].iloc[t].values * action[:, 0] - c * np.abs(previous_action - action[:, 0])
                     test_reward.append(r)
                     test_actions.append(action)
@@ -149,18 +158,14 @@ class PolicyGradient(object):
         model.save_model(model_path)
         return model
     
-    def back_test(self,
-                  asset_data_,
-                  test_length,
-                  normalize_length,
-                  c):
+    def back_test(self, asset_data_, c, test_length):
         test_reward = []
         test_actions = []
         previous_action = np.zeros(asset_data_.shape[0])
         for t in range(asset_data_.shape[1] - test_length, asset_data_.shape[1]):
-            data = asset_data_[:, t - normalize_length:t, :].values
+            data = asset_data_[:, t - self.normalize_length:t, :].values
             state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
-            action = self.trade(state, train=False, prob=False)
+            action = self._trade(state, train=False, prob=False)
             r = asset_data_[:, :, 'diff'].iloc[t].values * action[:, 0] - c * np.abs(previous_action - action[:, 0])
             test_reward.append(r)
             test_actions.append(action)
@@ -169,9 +174,9 @@ class PolicyGradient(object):
         print('back test_reward', np.sum(np.mean(test_reward, axis=1)))
         return np.sum(np.mean(test_reward, axis=1))
     
-    def real_trade(self, asset_data_, normalize_length, batch_size):
+    def trade(self, asset_data_):
         self.restore_buffer()
-        data = asset_data_[:, -normalize_length:, :].values
+        data = asset_data_[:, -self.normalize_length:, :].values
         state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
-        action_ = self.trade(state, train=False, prob=False, kp=1.0)[:, 0]
+        action_ = self._trade(state, train=False, prob=False, kp=1.0)[:, 0]
         return action_
