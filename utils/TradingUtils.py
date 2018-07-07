@@ -42,7 +42,7 @@ def re_balance(target_percent, symbol, asset, portfolio, base_currency, order_ty
                 print('cancel order debugging')
     
     balance_info = get_balance()
-    asset_info = lfilter(lambda x: x['base-currency'] == asset and x['quote-currency'] == 'btc', get_symbols()['data'])
+    asset_info = lfilter(lambda x: x['base-currency'] == asset and x['quote-currency'] == base_currency, get_symbols()['data'])
     amount_precision = asset_info[0]['amount-precision']
     price_precision = asset_info[0]['price-precision']
     
