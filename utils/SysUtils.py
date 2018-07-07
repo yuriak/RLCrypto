@@ -17,20 +17,18 @@ import urllib.request
 import requests
 
 # 此处填写APIKEY
-ACCESS_KEY = ''
-SECRET_KEY = ''
+ACCESS_KEY=''
+SECRET_KEY=''
 
 
 def init_account(account_file_path):
     if os.path.exists(account_file_path):
         with open(account_file_path, 'r+') as f:
+            global ACCESS_KEY
+            global SECRET_KEY
             account_info = json.loads(f.read())
             ACCESS_KEY = account_info['ACCESS_KEY']
             SECRET_KEY = account_info['SECRET_KEY']
-            return ACCESS_KEY, SECRET_KEY
-    else:
-        return '', ''
-
 
 # API 请求地址
 MARKET_URL = "https://api.huobi.pro"

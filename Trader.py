@@ -12,7 +12,7 @@ ACCOUNT_CONFIG_FILE = './config/account.json'
 LOG_FILE = './log/portfolio_log.csv'
 PORTFOLIO_CONFIG = './config/portfolio_config.json'
 TRADE_CONFIG = './config/trade_config.json'
-ACCESS_KEY, SECRET_KEY = init_account(ACCOUNT_CONFIG_FILE)
+init_account(ACCOUNT_CONFIG_FILE)
 print(get_accounts())
 with open(MODEL_TYPE_CONFIG, 'r') as f:
     model_type = json.loads(f.read())['model_type']
