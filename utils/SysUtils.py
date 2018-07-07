@@ -23,7 +23,7 @@ SECRET_KEY = ''
 
 def init_account(account_file_path):
     if os.path.exists(account_file_path):
-        with open('account.json', 'r+') as f:
+        with open(account_file_path, 'r+') as f:
             account_info = json.loads(f.read())
             access_key = account_info['ACCESS_KEY']
             secret_key = account_info['SECRET_KEY']
