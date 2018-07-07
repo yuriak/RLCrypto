@@ -100,7 +100,7 @@ class Trader(object):
             print('Init data and model')
             return
         actions = self.model.trade(asset_data_=self.asset_data)
-        print('predict action for portfolio', zip(lmap(lambda x: x[0], self.portfolio), actions))
+        print('predict action for portfolio', list(zip(lmap(lambda x: x[0], self.portfolio), actions)))
         for i in range(len(self.portfolio)):
             target_percent = actions[i]
             asset = self.portfolio[i][0]
