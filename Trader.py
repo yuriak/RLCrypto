@@ -7,14 +7,14 @@ from utils.DataUtils import default_pre_process
 from utils.TradingUtils import *
 
 MODEL_TYPE_CONFIG = './config/model_type.json'
-MODEL_PATH = './model_backup/RPG'
+MODEL_PATH = './model_backup/PolicyGradient'
 ACCOUNT_CONFIG_FILE = './config/account.json'
 LOG_FILE = './log/portfolio_log.csv'
 PORTFOLIO_CONFIG = './config/portfolio_config.json'
 ACCESS_KEY, SECRET_KEY = init_account(ACCOUNT_CONFIG_FILE)
 
 with open(MODEL_TYPE_CONFIG, 'r') as f:
-    model_type = json.loads(f.read())
+    model_type = json.loads(f.read())['model_type']
 if model_type == 'RecurrentPolicyGradient':
     TRADER_MODEL = RecurrentPolicyGradient
 else:
