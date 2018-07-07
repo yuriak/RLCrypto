@@ -6,13 +6,19 @@ from models.PolicyGradient import PolicyGradient
 from utils.DataUtils import default_pre_process
 from utils.TradingUtils import *
 
-TRADER_MODEL = RecurrentPolicyGradient
+MODEL_TYPE_CONFIG = './config/model_type.json'
 MODEL_PATH = './model_backup/RPG'
 ACCOUNT_CONFIG_FILE = './config/account.json'
 LOG_FILE = './log/portfolio_log.csv'
 PORTFOLIO_CONFIG = './config/portfolio_config.json'
-
 ACCESS_KEY, SECRET_KEY = init_account(ACCOUNT_CONFIG_FILE)
+
+with open(MODEL_TYPE_CONFIG, 'r') as f:
+    model_type = json.loads(f.read())
+if model_type == 'RecurrentPolicyGradient':
+    TRADER_MODEL = RecurrentPolicyGradient
+else:
+    TRADER_MODEL = PolicyGradient
 
 # training hyper-parameters
 REWARD_THRESHOLD = 0.3
