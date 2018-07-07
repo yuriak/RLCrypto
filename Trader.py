@@ -126,6 +126,7 @@ if __name__ == '__main__':
     trader.init_portfolio(portfolio_config=PORTFOLIO_CONFIG)
     trader.init_data()
     if command == 'trade':
+        trader.load_model()
         trader.trade()
     elif command == 'build_model':
         trader.build_model()
