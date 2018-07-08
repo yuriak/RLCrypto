@@ -66,7 +66,7 @@ class Trader(object):
         if len(self.portfolio) == 0:
             print('Load portfolio first')
             return
-        asset_data = klines(lmap(lambda x: x[0], self.portfolio), interval=TRADING_TICK_INTERVAL, count=BAR_COUNT)
+        asset_data = klines(lmap(lambda x: x[0], self.portfolio), base_currency=BASE_CURRENCY, interval=TRADING_TICK_INTERVAL, count=BAR_COUNT)
         asset_data = default_pre_process(asset_data)
         self.asset_data = asset_data
     
