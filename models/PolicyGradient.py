@@ -7,7 +7,7 @@ from models.layers import *
 
 
 class PolicyGradient(Model):
-    def __init__(self, s_dim, a_dim=2, hidden_units_number=[128, 128, 128, 64], learning_rate=0.001, batch_size=64, normalize_length=10):
+    def __init__(self, s_dim, a_dim=2, hidden_units_number=[256, 128, 128, 64], learning_rate=0.001, batch_size=64, normalize_length=10):
         super(PolicyGradient, self).__init__()
         tf.reset_default_graph()
         self.s = tf.placeholder(dtype=tf.float32, shape=[None, None, s_dim], name='s')
