@@ -40,7 +40,8 @@ with open(CONFIG_FILE, 'r') as f:
     
     TEST_LENGTH = test_config['test_length']
     
-    BAR_COUNT = data_config['bar_count']
+    TRAIN_BAR_COUNT = data_config['train_bar_count']
+    TRADE_BAR_COUNT = data_config['trade_bar_count']
     TICK_INTERVAL = data_config['tick_interval']
     
     MODEL_TYPE = trade_config['model_type']
@@ -69,11 +70,11 @@ class Trader(object):
             print('Load portfolio successfully')
             self.portfolio = json.loads(f.read())
     
-    def init_data(self):
+    def init_data(self, bar_count):
         if len(self.portfolio) == 0:
             print('Load portfolio first')
             return
-        asset_data = klines(self.portfolio, base_currency=BASE_CURRENCY, interval=TICK_INTERVAL, count=BAR_COUNT)
+        asset_data = klines(self.portfolio, base_currency=BASE_CURRENCY, interval=TICK_INTERVAL, count=bar_count)
         asset_data = default_pre_process(asset_data)
         self.asset_data = asset_data
     
@@ -137,11 +138,12 @@ if __name__ == '__main__':
     command = sys.argv[1]
     trader = Trader()
     trader.init_portfolio(portfolio_config=PORTFOLIO_CONFIG)
-    trader.init_data()
     if command == 'trade':
+        trader.init_data(TRADE_BAR_COUNT)
         trader.load_model()
         trader.trade()
     elif command == 'build_model':
+        trader.init_data(TRAIN_BAR_COUNT)
         trader.build_model()
     else:
         print('invalid command')

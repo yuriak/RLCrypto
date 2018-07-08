@@ -38,7 +38,8 @@ def re_balance(target_percent,
                amount_discount=0.05,
                max_asset_percent=1.0,
                debug=True,
-               wait_interval=10):
+               wait_interval=10,
+               trace_order=False):
     portfolio = portfolio + [base_currency]
     current_order_info = orders_list(symbol=symbol, states='submitted')['data']
     if len(current_order_info) > 0:
@@ -89,53 +90,59 @@ def re_balance(target_percent,
         target_percent = 0
     trade_percent = target_percent - holding_percent
     print('holding: {0}% number:{1}'.format(holding_percent, asset_balance))
+    target_amount = None
+    target_direction = None
+    target_price = None
     if trade_percent > 0.1:
-        target_buy_amount = max_asset_balance * trade_percent * (1 - amount_discount)
-        if target_buy_amount > max_buy_amount:
-            target_buy_amount = max_buy_amount
-        target_buy_amount = round(target_buy_amount, amount_precision)
+        target_amount = max_asset_balance * trade_percent * (1 - amount_discount)
+        if target_amount > max_buy_amount:
+            target_amount = max_buy_amount
+        target_amount = round(target_amount, amount_precision)
         if amount_precision == 0:
-            target_buy_amount = int(target_buy_amount)
+            target_amount = int(target_amount)
+        target_direction = 'buy'
         if order_type == 'limit':
-            print('send limit-buy order: buy {0}, target holding {1}%, at price {2} on {3}'.format(target_buy_amount, target_percent * 100, limit_buy_price, symbol))
+            target_price = limit_buy_price
         else:
-            print('send market-buy order: buy {0}, target holding {1}%, at price {2} on {3}'.format(target_buy_amount, target_percent * 100, market_price, symbol))
-        if not debug:
-            if order_type == 'limit':
-                order = send_order(symbol=symbol, source='api', amount=target_buy_amount, _type='buy-limit', price=limit_buy_price)
-                print(order)
-                time.sleep(wait_interval)
-                return order['data']
-            else:
-                order = send_order(symbol=symbol, source='api', amount=target_buy_amount, _type='buy-market')
-                print(order)
-                time.sleep(wait_interval)
-                return order['data']
-        else:
-            print('debugging')
-            return 'debugging'
+            target_price = market_price
     elif trade_percent < -0.01:
-        target_sell_amount = max_asset_balance * np.abs(trade_percent) * (1 - amount_discount)
-        if target_sell_amount > asset_balance:
-            target_sell_amount = asset_balance
-        target_sell_amount = round(target_sell_amount, amount_precision)
+        target_amount = max_asset_balance * np.abs(trade_percent) * (1 - amount_discount)
+        if target_amount > asset_balance:
+            target_amount = asset_balance
+        target_amount = round(target_amount, amount_precision)
         if amount_precision == 0:
-            target_sell_amount = int(target_sell_amount)
+            target_amount = int(target_amount)
+        target_direction = 'sell'
         if order_type == 'limit':
-            print('send market-sell order: sell {0}, target holding {1}%, at price {2} on {3}'.format(target_sell_amount, target_percent * 100, limit_sell_price, symbol))
+            target_price = limit_sell_price
         else:
-            print('send market-sell order: sell {0}, target holding {1}%, at price {2} on {3}'.format(target_sell_amount, target_percent * 100, market_price, symbol))
-        if not debug:
-            if order_type == 'limit':
-                order = send_order(symbol=symbol, source='api', amount=target_sell_amount, _type='sell-limit', price=limit_sell_price)
-                print(order)
-                time.sleep(wait_interval)
-                return order['data']
-            else:
-                order = send_order(symbol=symbol, source='api', amount=target_sell_amount, _type='sell-market')
-                print(order)
-                time.sleep(wait_interval)
-                return order['data']
+            target_price = market_price
+    else:
+        return
+    if target_price is None or target_amount is None or target_direction is None:
+        return
+    print("send {0}-{1} order for {2}: target holding {3}, on price{4}".format(order_type, target_direction, symbol, target_amount, target_price))
+    if not debug:
+        order = send_order(symbol=symbol,
+                           source='api',
+                           amount=target_amount,
+                           _type=target_direction + '-' + order_type,
+                           price=target_price if order_type == 'limit' else 0)
+        print(order)
+        order_id = order['data']
+        if trace_order:
+            if order_id is not None:
+                order_filled = False
+                while not order_filled:
+                    info = order_info(order_id)
+                    if info['data'] is None:
+                        break
+                    order_filled = (info['data']['state'] == 'filled')
+                    time.sleep(wait_interval)
+                return
         else:
-            print('debugging')
-            return 'debugging'
+            time.sleep(wait_interval)
+            return
+    else:
+        print("debugging")
+        return
