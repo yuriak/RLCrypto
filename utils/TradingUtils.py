@@ -28,10 +28,19 @@ def klines(assets, base_currency='btc', interval='60min', count=2000):
     return lfilter(lambda x: x[1] is not None, lmap(lambda x: (x, kline(x, base_currency=base_currency, interval=interval, count=count)), assets))
 
 
-def re_balance(target_percent, symbol, asset, portfolio, base_currency, order_type='limit', price_discount=0, amount_discount=0.05, debug=True, max_asset_percent=1.0):
+def re_balance(target_percent,
+               symbol,
+               asset,
+               portfolio,
+               base_currency,
+               order_type='limit',
+               price_discount=0,
+               amount_discount=0.05,
+               max_asset_percent=1.0,
+               debug=True,
+               wait_interval=10):
     portfolio = portfolio + [base_currency]
     current_order_info = orders_list(symbol=symbol, states='submitted')['data']
-    # print('current order info', current_order_info)
     if len(current_order_info) > 0:
         for order in current_order_info:
             order_id = order['id']
@@ -95,10 +104,12 @@ def re_balance(target_percent, symbol, asset, portfolio, base_currency, order_ty
             if order_type == 'limit':
                 order = send_order(symbol=symbol, source='api', amount=target_buy_amount, _type='buy-limit', price=limit_buy_price)
                 print(order)
+                time.sleep(wait_interval)
                 return order['data']
             else:
                 order = send_order(symbol=symbol, source='api', amount=target_buy_amount, _type='buy-market')
                 print(order)
+                time.sleep(wait_interval)
                 return order['data']
         else:
             print('debugging')
@@ -118,10 +129,12 @@ def re_balance(target_percent, symbol, asset, portfolio, base_currency, order_ty
             if order_type == 'limit':
                 order = send_order(symbol=symbol, source='api', amount=target_sell_amount, _type='sell-limit', price=limit_sell_price)
                 print(order)
+                time.sleep(wait_interval)
                 return order['data']
             else:
                 order = send_order(symbol=symbol, source='api', amount=target_sell_amount, _type='sell-market')
                 print(order)
+                time.sleep(wait_interval)
                 return order['data']
         else:
             print('debugging')
