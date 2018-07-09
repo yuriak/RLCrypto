@@ -114,13 +114,10 @@ class Trader(object):
         actions = self.model.trade(asset_data=self.asset_data)
         print('predict action for portfolio', list(zip(self.portfolio, actions)))
         total = np.sum(actions)
-        
+        if total > 0:
+            actions = actions / total
         actions = sorted(zip(self.portfolio, actions), key=lambda x: x[1])
         for asset, action in actions:
-            if total > 0:
-                max_asset_percent = action / total
-            else:
-                max_asset_percent = action
             re_balance(action,
                        symbol=asset + BASE_CURRENCY,
                        asset=asset,
@@ -130,7 +127,6 @@ class Trader(object):
                        price_discount=PRICE_DISCOUNT,
                        amount_discount=AMOUNT_DISCOUNT,
                        debug=DEBUG_MODE,
-                       max_asset_percent=max_asset_percent,
                        wait_interval=ORDER_WAIT_INTERVAL,
                        trace_order=TRACE_ORDER)
         print(datetime.datetime.now())

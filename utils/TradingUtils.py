@@ -36,7 +36,6 @@ def re_balance(target_percent,
                order_type='limit',
                price_discount=0,
                amount_discount=0.05,
-               max_asset_percent=1.0,
                debug=True,
                wait_interval=10,
                trace_order=False):
@@ -85,12 +84,10 @@ def re_balance(target_percent,
     print("base_balance:", base_balance)
     print("asset_balance:", asset_balance)
     
-    # max_asset_value = portfolio_value * max_asset_percent if base_balance > portfolio_value * max_asset_percent else base_balance
     holding_percent = asset_value / portfolio_value
-    max_asset_balance = portfolio_value / market_price
-    # max_buy_amount = max_asset_balance - asset_balance
     trade_percent = target_percent - holding_percent
     print('holding: {0}% number:{1}'.format(holding_percent, asset_balance))
+    
     trade_amount = None
     trade_direction = None
     trade_price = None
