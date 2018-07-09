@@ -142,6 +142,7 @@ if __name__ == '__main__':
     trader.init_portfolio(portfolio_config=PORTFOLIO_CONFIG)
     if command == 'trade':
         last_trade_hour = datetime.datetime.now().hour
+        trader.init_data(TRADE_BAR_COUNT)
         trader.load_model()
         while True:
             if datetime.datetime.now().minute == TRADE_TRIGGER and last_trade_hour != datetime.datetime.now().hour:
