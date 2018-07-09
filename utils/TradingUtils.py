@@ -28,10 +28,22 @@ def klines(assets, base_currency='btc', interval='60min', count=2000):
     return lfilter(lambda x: x[1] is not None, lmap(lambda x: (x, kline(x, base_currency=base_currency, interval=interval, count=count)), assets))
 
 
-def re_balance(target_percent, symbol, asset, portfolio, base_currency, order_type='limit', price_discount=0, amount_discount=0.05, debug=True, max_asset_percent=1.0):
+def re_balance(target_percent,
+               symbol,
+               asset,
+               portfolio,
+               base_currency,
+               order_type='limit',
+               price_discount=0,
+               amount_discount=0.05,
+               debug=True,
+               wait_interval=10,
+               trace_order=False,
+               max_order_waiting_time=5 * 60
+               ):
+    print("+" * 50)
     portfolio = portfolio + [base_currency]
     current_order_info = orders_list(symbol=symbol, states='submitted')['data']
-    # print('current order info', current_order_info)
     if len(current_order_info) > 0:
         for order in current_order_info:
             order_id = order['id']
@@ -53,6 +65,7 @@ def re_balance(target_percent, symbol, asset, portfolio, base_currency, order_ty
     portfolio_value = 0
     base_balance = 0
     asset_balance = 0
+    asset_value = 0
     for currency in portfolio:
         balance = list(filter(lambda x: x['currency'] == currency and x['type'] == 'trade', balance_info['data']['list']))
         if len(balance) > 0:
@@ -62,67 +75,80 @@ def re_balance(target_percent, symbol, asset, portfolio, base_currency, order_ty
             else:
                 ticker = get_ticker(currency + base_currency)['tick']
                 price = ticker['close']
-                asset_value = float(balance[0]['balance']) * price
-                portfolio_value += asset_value
+                value = float(balance[0]['balance']) * price
+                portfolio_value += value
                 if currency == asset:
+                    asset_value = value
                     asset_balance = float(balance[0]['balance'])
                     market_price = round(ticker['close'], price_precision)
                     limit_buy_price = round(float(ticker['bid'][0]) * (1 - price_discount), price_precision)
                     limit_sell_price = round(float(ticker['ask'][0]) * (1 + price_discount), price_precision)
+    print("portfolio_value:", portfolio_value)
+    print("base_balance:", base_balance)
+    print("asset_balance:", asset_balance)
+    print("asset_value:", asset_value)
+    print("*" * 25)
     
-    max_asset_value = portfolio_value * max_asset_percent if base_balance > portfolio_value * max_asset_percent else base_balance
-    max_asset_balance = max_asset_value / market_price
-    max_buy_amount = max_asset_balance - asset_balance
-    holding_percent = asset_balance / max_asset_balance
-    if target_percent > 0.9:
-        target_percent = 1
-    elif target_percent < 0.1:
-        target_percent = 0
-    trade_percent = target_percent - holding_percent
-    print('holding: {0}% number:{1}'.format(holding_percent, asset_balance))
-    if trade_percent > 0.1:
-        target_buy_amount = max_asset_balance * trade_percent * (1 - amount_discount)
-        if target_buy_amount > max_buy_amount:
-            target_buy_amount = max_buy_amount
-        target_buy_amount = round(target_buy_amount, amount_precision)
-        if amount_precision == 0:
-            target_buy_amount = int(target_buy_amount)
-        if order_type == 'limit':
-            print('send limit-buy order: buy {0}, target holding {1}%, at price {2} on {3}'.format(target_buy_amount, target_percent * 100, limit_buy_price, symbol))
+    holding_percent = asset_value / portfolio_value
+    target_amount = (portfolio_value * target_percent) / market_price
+    trade_amount = (target_amount - asset_balance)
+    trade_direction = 'buy' if trade_amount > 0 else 'sell'
+    trade_price = (
+        (limit_buy_price if trade_amount > 0 else limit_sell_price)
+        if order_type == 'limit' else market_price)
+    
+    trade_amount = round(abs(trade_amount) * (1 - amount_discount), amount_precision)
+    trade_percent = abs(target_percent - holding_percent)
+    if amount_precision == 0:
+        trade_amount = int(trade_amount)
+    print('current holding: {0}%, amount: {1}\n'
+          'target holding: {2}%, amount: {3}\n'
+          'trade {4}%, amount: {5}'.format(holding_percent * 100,
+                                           asset_balance,
+                                           target_percent * 100,
+                                           target_amount,
+                                           trade_percent * 100,
+                                           trade_amount))
+    print("*" * 25)
+    print("send {0}-{1} order for {2}: "
+          "on price: {3} with amount: {4}".format(order_type,
+                                                  trade_direction,
+                                                  symbol,
+                                                  trade_price,
+                                                  trade_amount))
+    if not debug:
+        order = send_order(symbol=symbol,
+                           source='api',
+                           amount=trade_amount,
+                           _type=trade_direction + '-' + order_type,
+                           price=trade_price if order_type == 'limit' else 0)
+        print(order)
+        order_id = order['data']
+        if trace_order:
+            if order_id is not None:
+                order_filled = False
+                print("tracing order")
+                start_time = time.time()
+                while not order_filled:
+                    info = order_info(order_id)
+                    if info['data'] is None:
+                        break
+                    order_filled = (info['data']['state'] == 'filled')
+                    time.sleep(wait_interval)
+                    if time.time() - start_time > max_order_waiting_time:
+                        print("exceed pending time, send market order")
+                        cancel_order(order_id)
+                        order = send_order(symbol=symbol,
+                                           source='api',
+                                           amount=trade_amount, _type=trade_direction + '-market',
+                                           price=0)
+                        print(order)
+                        return
+                print("order full filled")
+                return
         else:
-            print('send market-buy order: buy {0}, target holding {1}%, at price {2} on {3}'.format(target_buy_amount, target_percent * 100, market_price, symbol))
-        if not debug:
-            if order_type == 'limit':
-                order = send_order(symbol=symbol, source='api', amount=target_buy_amount, _type='buy-limit', price=limit_buy_price)
-                print(order)
-                return order['data']
-            else:
-                order = send_order(symbol=symbol, source='api', amount=target_buy_amount, _type='buy-market')
-                print(order)
-                return order['data']
-        else:
-            print('debugging')
-            return 'debugging'
-    elif trade_percent < -0.01:
-        target_sell_amount = max_asset_balance * np.abs(trade_percent) * (1 - amount_discount)
-        if target_sell_amount > asset_balance:
-            target_sell_amount = asset_balance
-        target_sell_amount = round(target_sell_amount, amount_precision)
-        if amount_precision == 0:
-            target_sell_amount = int(target_sell_amount)
-        if order_type == 'limit':
-            print('send market-sell order: sell {0}, target holding {1}%, at price {2} on {3}'.format(target_sell_amount, target_percent * 100, limit_sell_price, symbol))
-        else:
-            print('send market-sell order: sell {0}, target holding {1}%, at price {2} on {3}'.format(target_sell_amount, target_percent * 100, market_price, symbol))
-        if not debug:
-            if order_type == 'limit':
-                order = send_order(symbol=symbol, source='api', amount=target_sell_amount, _type='sell-limit', price=limit_sell_price)
-                print(order)
-                return order['data']
-            else:
-                order = send_order(symbol=symbol, source='api', amount=target_sell_amount, _type='sell-market')
-                print(order)
-                return order['data']
-        else:
-            print('debugging')
-            return 'debugging'
+            time.sleep(wait_interval)
+            return
+    else:
+        print("debugging")
+        return

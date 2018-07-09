@@ -1,0 +1,55 @@
+{
+  "models": {
+	"PolicyGradient": {
+	  "hidden_units_number": [
+		256,
+		128,
+		128,
+		64
+	  ],
+	  "model_path": "./model_backup/PolicyGradient"
+	},
+	"RecurrentPolicyGradient": {
+	  "hidden_units_number": [
+		128,
+		64
+	  ],
+	  "model_path": "./model_backup/RecurrentPolicyGradient"
+	}
+  },
+  "data": {
+	"trade_bar_count": 200,
+	"train_bar_count": 2000,
+	"tick_interval": "60min"
+  },
+  "train": {
+	"fee": 1e-5,
+	"normalize_length": 10,
+	"batch_size": 64,
+	"learning_rate": 1e-3,
+	"reward_threshold": 0.3,
+	"max_training_epoch": 30,
+	"train_length": 1500
+  },
+  "test": {
+	"test_length": 400
+  },
+  "trade": {
+	"base_currency": "eth",
+	"debug_mode": true,
+	"portfolio_config": "./config/portfolio_config.json",
+	"model_type": "PolicyGradient",
+	"account_file": "./config/account.json",
+	"order_type": "limit",
+	"price_discount": -1e-3,
+	"amount_discount": 0.05,
+	"order_wait_interval": 0,
+	"trace_order": true,
+	"trade_trigger": 55,
+	"max_asset_percent": 0.5,
+	"max_order_waiting_time": 300
+  },
+  "system": {
+	"log_file": "./log/portfolio_log.csv"
+  }
+}

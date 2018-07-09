@@ -24,13 +24,13 @@ class RecurrentPolicyGradient(Model):
         self.s_next_buffer = []
         self.dropout_keep_prob = tf.placeholder(dtype=tf.float32, shape=[], name='dropout_keep_prob')
         with tf.variable_scope('rnn_encoder', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
-            cells = add_GRUs(units_numbers=[128] * 2, acts=[tf.nn.tanh] * 2, kp=self.dropout_keep_prob)
+            cells = add_GRUs(units_numbers=[128, 128], acts=[tf.nn.tanh, tf.nn.tanh], kp=self.dropout_keep_prob)
             self.rnn_output, _ = tf.nn.dynamic_rnn(inputs=self.s, cell=cells, dtype=tf.float32)
         
         with tf.variable_scope('supervised', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
             self.state_predict = add_dense(inputs=self.rnn_output,
                                            units_numbers=hidden_units_number + [self.s_dim],
-                                           acts=([tf.nn.relu] * len(hidden_units_number) + [None]),
+                                           acts=([tf.nn.relu for _ in range(len(hidden_units_number))] + [None]),
                                            kp=self.dropout_keep_prob,
                                            use_bias=True)
             self.state_loss = tf.losses.mean_squared_error(self.state_predict, self.s_next)
@@ -38,7 +38,7 @@ class RecurrentPolicyGradient(Model):
         with tf.variable_scope('policy_gradient', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
             self.a_prob = add_dense(inputs=self.rnn_output,
                                     units_numbers=(hidden_units_number + [self.a_dim]),
-                                    acts=([tf.nn.relu] * len(hidden_units_number) + [None]),
+                                    acts=([tf.nn.relu for _ in range(len(hidden_units_number))] + [None]),
                                     kp=self.dropout_keep_prob,
                                     use_bias=True)
             self.a_out = tf.nn.softmax(self.a_prob, axis=-1)
@@ -92,7 +92,7 @@ class RecurrentPolicyGradient(Model):
         if train:
             for ap in a_prob:
                 if prob:
-                    np.random.normal(loc=ap, scale=(1 - ap))
+                    ap = np.random.normal(loc=ap, scale=(1 - ap))
                     actions.append(np.exp(ap) / np.sum(np.exp(ap)))
                 else:
                     a_indices = np.arange(ap.shape[0])
@@ -122,8 +122,9 @@ class RecurrentPolicyGradient(Model):
         self.saver.save(self.session, model_file)
     
     @staticmethod
-    def create_new_model(asset_data_,
+    def create_new_model(asset_data,
                          c,
+                         hidden_units_number,
                          normalize_length,
                          batch_size,
                          train_length,
@@ -134,8 +135,9 @@ class RecurrentPolicyGradient(Model):
         current_model_reward = -np.inf
         model = None
         while current_model_reward < pass_threshold:
-            model = RecurrentPolicyGradient(s_dim=asset_data_.shape[2],
+            model = RecurrentPolicyGradient(s_dim=asset_data.shape[2],
                                             a_dim=2,
+                                            hidden_units_number=hidden_units_number,
                                             learning_rate=learning_rate,
                                             batch_size=batch_size,
                                             normalize_length=normalize_length)
@@ -147,15 +149,15 @@ class RecurrentPolicyGradient(Model):
                 test_reward = []
                 test_actions = []
                 train_reward = []
-                previous_action = np.zeros(asset_data_.shape[0])
+                previous_action = np.zeros(asset_data.shape[0])
                 for t in range(model.normalize_length, train_length):
-                    data = asset_data_[:, t - model.normalize_length:t, :].values
+                    data = asset_data[:, t - model.normalize_length:t, :].values
                     state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
-                    data = asset_data_[:, t - model.normalize_length + 1:t + 1, :].values
+                    data = asset_data[:, t - model.normalize_length + 1:t + 1, :].values
                     next_state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
                     model.save_current_state(s=state)
                     action_ = model._trade(train=True, kp=1.0, prob=False)
-                    r = asset_data_[:, :, 'diff'].iloc[t].values * action_[:, 0] - c * np.abs(previous_action - action_[:, 0])
+                    r = asset_data[:, :, 'diff'].iloc[t].values * action_[:, 0] - c * np.abs(previous_action - action_[:, 0])
                     model.save_transition(a=action_, r=r, s_next=next_state)
                     previous_action = action_[:, 0]
                     train_reward.append(r)
@@ -165,13 +167,13 @@ class RecurrentPolicyGradient(Model):
                 model.restore_buffer()
                 print(e, 'train_reward', np.sum(np.mean(train_reward, axis=1)), np.mean(train_reward))
                 train_mean_r.append(np.mean(train_reward))
-                previous_action = np.zeros(asset_data_.shape[0])
-                for t in range(train_length, asset_data_.shape[1]):
-                    data = asset_data_[:, t - model.normalize_length:t, :].values
+                previous_action = np.zeros(asset_data.shape[0])
+                for t in range(train_length, asset_data.shape[1]):
+                    data = asset_data[:, t - model.normalize_length:t, :].values
                     state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
                     model.save_current_state(s=state)
                     action_ = model._trade(train=False, kp=1.0, prob=False)
-                    r = asset_data_[:, :, 'diff'].iloc[t].values * action_[:, 0] - c * np.abs(previous_action - action_[:, 0])
+                    r = asset_data[:, :, 'diff'].iloc[t].values * action_[:, 0] - c * np.abs(previous_action - action_[:, 0])
                     test_reward.append(r)
                     test_actions.append(action_)
                     previous_action = action_[:, 0]
@@ -180,6 +182,7 @@ class RecurrentPolicyGradient(Model):
                 print(e, 'test_reward', np.sum(np.mean(test_reward, axis=1)), np.mean(test_reward))
                 test_mean_r.append(np.mean(test_reward))
                 model.restore_buffer()
+                current_model_reward = np.sum(np.mean(test_reward, axis=1))
                 if np.sum(np.mean(test_reward, axis=1)) > pass_threshold:
                     break
             model.restore_buffer()
@@ -187,16 +190,16 @@ class RecurrentPolicyGradient(Model):
         model.save_model(model_path)
         return model
     
-    def back_test(self, asset_data_, c, test_length):
-        previous_action = np.zeros(asset_data_.shape[0])
+    def back_test(self, asset_data, c, test_length):
+        previous_action = np.zeros(asset_data.shape[0])
         test_reward = []
         test_actions = []
-        for t in range(asset_data_.shape[1] - test_length, asset_data_.shape[1]):
-            data = asset_data_[:, t - self.normalize_length:t, :].values
+        for t in range(asset_data.shape[1] - test_length, asset_data.shape[1]):
+            data = asset_data[:, t - self.normalize_length:t, :].values
             state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
             self.save_current_state(s=state)
             action_ = self._trade(train=False, kp=1.0, prob=False)
-            r = asset_data_[:, :, 'diff'].iloc[t].values * action_[:, 0] - c * np.abs(previous_action - action_[:, 0])
+            r = asset_data[:, :, 'diff'].iloc[t].values * action_[:, 0] - c * np.abs(previous_action - action_[:, 0])
             test_reward.append(r)
             test_actions.append(action_)
             previous_action = action_[:, 0]
@@ -206,9 +209,9 @@ class RecurrentPolicyGradient(Model):
         print('back test_reward', np.sum(np.mean(test_reward, axis=1)))
         return np.sum(np.mean(test_reward, axis=1))
     
-    def trade(self, asset_data_):
-        for t in range(asset_data_.shape[1] - self.batch_size, asset_data_.shape[0]):
-            data = asset_data_[:, t - self.normalize_length + 1:t + 1, :].values
+    def trade(self, asset_data):
+        for t in range(asset_data.shape[1] - self.batch_size, asset_data.shape[0]):
+            data = asset_data[:, t - self.normalize_length + 1:t + 1, :].values
             state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
             self.save_current_state(s=state)
         action_ = self._trade(train=False, kp=1.0, prob=False)[:, 0]
