@@ -182,6 +182,7 @@ class RecurrentPolicyGradient(Model):
                 print(e, 'test_reward', np.sum(np.mean(test_reward, axis=1)), np.mean(test_reward))
                 test_mean_r.append(np.mean(test_reward))
                 model.restore_buffer()
+                current_model_reward = np.sum(np.mean(test_reward, axis=1))
                 if np.sum(np.mean(test_reward, axis=1)) > pass_threshold:
                     break
             model.restore_buffer()

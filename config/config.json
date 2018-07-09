@@ -18,8 +18,8 @@
 	}
   },
   "data": {
-	"trade_bar_count": 2000,
-	"train_bar_count": 200,
+	"trade_bar_count": 200,
+	"train_bar_count": 2000,
 	"tick_interval": "60min"
   },
   "train": {
@@ -41,7 +41,7 @@
 	"model_type": "PolicyGradient",
 	"account_file": "./config/account.json",
 	"order_type": "limit",
-	"price_discount": -1e-2,
+	"price_discount": -1e-3,
 	"amount_discount": 0.05,
 	"order_wait_interval": 0,
 	"trace_order": true,
