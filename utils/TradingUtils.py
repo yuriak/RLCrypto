@@ -91,13 +91,13 @@ def re_balance(target_percent,
     
     holding_percent = asset_value / portfolio_value
     target_amount = (portfolio_value * target_percent) / market_price
-    trade_amount = (target_amount - asset_balance) * (1 - amount_discount)
+    trade_amount = (target_amount - asset_balance)
     trade_direction = 'buy' if trade_amount > 0 else 'sell'
     trade_price = (
         (limit_buy_price if trade_amount > 0 else limit_sell_price)
         if order_type == 'limit' else market_price)
     
-    trade_amount = round(abs(trade_amount), amount_precision)
+    trade_amount = round(abs(trade_amount) * (1 - amount_discount), amount_precision)
     trade_percent = abs(target_percent - holding_percent)
     if amount_precision == 0:
         trade_amount = int(trade_amount)

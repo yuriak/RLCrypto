@@ -42,7 +42,7 @@
 	"account_file": "./config/account.json",
 	"order_type": "limit",
 	"price_discount": -1e-2,
-	"amount_discount": 2000,
+	"amount_discount": 0.05,
 	"order_wait_interval": 0,
 	"trace_order": true,
 	"trade_trigger": 55,
