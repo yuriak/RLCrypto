@@ -153,7 +153,8 @@ if __name__ == '__main__':
                     last_trade_hour = datetime.datetime.now().hour
                     trader.init_data(TRADE_BAR_COUNT)
                     trader.trade()
-            except Exception:
+            except Exception as e:
+                print(e)
                 pass
     elif command == 'build_model':
         trader.init_data(TRAIN_BAR_COUNT)
