@@ -63,6 +63,7 @@ def re_balance(target_percent,
     portfolio_value = 0
     base_balance = 0
     asset_balance = 0
+    asset_value = 0
     for currency in portfolio:
         balance = list(filter(lambda x: x['currency'] == currency and x['type'] == 'trade', balance_info['data']['list']))
         if len(balance) > 0:
@@ -72,62 +73,57 @@ def re_balance(target_percent,
             else:
                 ticker = get_ticker(currency + base_currency)['tick']
                 price = ticker['close']
-                asset_value = float(balance[0]['balance']) * price
-                portfolio_value += asset_value
+                value = float(balance[0]['balance']) * price
+                portfolio_value += value
                 if currency == asset:
+                    asset_value = value
                     asset_balance = float(balance[0]['balance'])
                     market_price = round(ticker['close'], price_precision)
                     limit_buy_price = round(float(ticker['bid'][0]) * (1 - price_discount), price_precision)
                     limit_sell_price = round(float(ticker['ask'][0]) * (1 + price_discount), price_precision)
+    print("portfolio_value:", portfolio_value)
+    print("base_balance:", base_balance)
+    print("asset_balance:", asset_balance)
     
-    max_asset_value = portfolio_value * max_asset_percent if base_balance > portfolio_value * max_asset_percent else base_balance
-    max_asset_balance = max_asset_value / market_price
-    max_buy_amount = max_asset_balance - asset_balance
-    holding_percent = asset_balance / max_asset_balance
-    if target_percent > 0.9:
-        target_percent = 1
-    elif target_percent < 0.1:
-        target_percent = 0
+    # max_asset_value = portfolio_value * max_asset_percent if base_balance > portfolio_value * max_asset_percent else base_balance
+    holding_percent = asset_value / portfolio_value
+    max_asset_balance = portfolio_value / market_price
+    # max_buy_amount = max_asset_balance - asset_balance
     trade_percent = target_percent - holding_percent
     print('holding: {0}% number:{1}'.format(holding_percent, asset_balance))
-    target_amount = None
-    target_direction = None
-    target_price = None
-    if trade_percent > 0.1:
-        target_amount = max_asset_balance * trade_percent * (1 - amount_discount)
-        if target_amount > max_buy_amount:
-            target_amount = max_buy_amount
-        target_amount = round(target_amount, amount_precision)
-        if amount_precision == 0:
-            target_amount = int(target_amount)
-        target_direction = 'buy'
-        if order_type == 'limit':
-            target_price = limit_buy_price
-        else:
-            target_price = market_price
-    elif trade_percent < -0.01:
-        target_amount = max_asset_balance * np.abs(trade_percent) * (1 - amount_discount)
-        if target_amount > asset_balance:
-            target_amount = asset_balance
-        target_amount = round(target_amount, amount_precision)
-        if amount_precision == 0:
-            target_amount = int(target_amount)
-        target_direction = 'sell'
-        if order_type == 'limit':
-            target_price = limit_sell_price
-        else:
-            target_price = market_price
+    trade_amount = None
+    trade_direction = None
+    trade_price = None
+    if trade_percent > 0:
+        trade_amount = ((portfolio_value * trade_percent) / market_price) * (1 - amount_discount)
+        trade_direction = 'buy'
+        trade_price = limit_buy_price if order_type == 'limit' else market_price
+    elif trade_percent < 0:
+        trade_amount = ((portfolio_value * abs(trade_percent)) / market_price) * (1 - amount_discount)
+        trade_direction = 'sell'
+        trade_price = limit_sell_price if order_type == 'limit' else market_price
     else:
         return
-    if target_price is None or target_amount is None or target_direction is None:
+    if trade_price is None or trade_amount is None or trade_direction is None:
         return
-    print("send {0}-{1} order for {2}: target holding {3}, on price {4}".format(order_type, target_direction, symbol, target_amount, target_price))
+    trade_amount = round(trade_amount, amount_precision)
+    if amount_precision == 0:
+        trade_amount = int(trade_amount)
+    print("send {0}-{1} order for {2}: "
+          "target holding amount {3}, "
+          "target holding percent {4}, "
+          "on price {5}".format(order_type,
+                                trade_direction,
+                                symbol,
+                                trade_amount,
+                                target_percent,
+                                trade_price))
     if not debug:
         order = send_order(symbol=symbol,
                            source='api',
-                           amount=target_amount,
-                           _type=target_direction + '-' + order_type,
-                           price=target_price if order_type == 'limit' else 0)
+                           amount=trade_amount,
+                           _type=trade_direction + '-' + order_type,
+                           price=trade_price if order_type == 'limit' else 0)
         print(order)
         order_id = order['data']
         if trace_order:
