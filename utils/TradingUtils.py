@@ -39,6 +39,7 @@ def re_balance(target_percent,
                debug=True,
                wait_interval=10,
                trace_order=False):
+    print("+" * 50)
     portfolio = portfolio + [base_currency]
     current_order_info = orders_list(symbol=symbol, states='submitted')['data']
     if len(current_order_info) > 0:
@@ -83,6 +84,8 @@ def re_balance(target_percent,
     print("portfolio_value:", portfolio_value)
     print("base_balance:", base_balance)
     print("asset_balance:", asset_balance)
+    print("asset_value:", asset_value)
+    print("*" * 25)
     
     holding_percent = asset_value / portfolio_value
     target_amount = (portfolio_value * target_percent) / market_price
@@ -98,19 +101,19 @@ def re_balance(target_percent,
         trade_amount = int(trade_amount)
     print('current holding: {0}%, amount: {1}\n'
           'target holding: {2}%, amount: {3}\n'
-          'trade {3}%, amount: {4}\n'.format(holding_percent * 100,
+          'trade {4}%, amount: {5}'.format(holding_percent * 100,
                                              asset_balance,
                                              target_percent * 100,
                                              target_amount,
                                              trade_percent * 100,
                                              trade_amount))
-    
+    print("*" * 25)
     print("send {0}-{1} order for {2}: "
-          "on price {3} with amount{4}".format(order_type,
-                                               trade_direction,
-                                               symbol,
-                                               trade_price,
-                                               trade_amount))
+          "on price: {3} with amount: {4}".format(order_type,
+                                                  trade_direction,
+                                                  symbol,
+                                                  trade_price,
+                                                  trade_amount))
     if not debug:
         order = send_order(symbol=symbol,
                            source='api',
