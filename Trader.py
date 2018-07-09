@@ -141,7 +141,7 @@ if __name__ == '__main__':
     trader = Trader()
     trader.init_portfolio(portfolio_config=PORTFOLIO_CONFIG)
     if command == 'trade':
-        last_trade_hour = datetime.datetime.now().hour
+        last_trade_hour = None
         trader.init_data(TRADE_BAR_COUNT)
         trader.load_model()
         while True:

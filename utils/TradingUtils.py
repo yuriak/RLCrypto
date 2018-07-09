@@ -133,12 +133,14 @@ def re_balance(target_percent,
         if trace_order:
             if order_id is not None:
                 order_filled = False
+                print("tracing order")
                 while not order_filled:
                     info = order_info(order_id)
                     if info['data'] is None:
                         break
                     order_filled = (info['data']['state'] == 'filled')
                     time.sleep(wait_interval)
+                print("order full filled")
                 return
         else:
             time.sleep(wait_interval)
