@@ -210,7 +210,8 @@ class RecurrentPolicyGradient(Model):
         return np.sum(np.mean(test_reward, axis=1))
     
     def trade(self, asset_data):
-        for t in range(asset_data.shape[1] - self.batch_size, asset_data.shape[0]):
+        self.restore_buffer()
+        for t in range(asset_data.shape[1] - self.batch_size, asset_data.shape[1]):
             data = asset_data[:, t - self.normalize_length + 1:t + 1, :].values
             state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
             self.save_current_state(s=state)
