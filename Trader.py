@@ -30,6 +30,7 @@ with open(CONFIG_FILE, 'r') as f:
     ORDER_WAIT_INTERVAL = trade_config['order_wait_interval']
     TRACE_ORDER = trade_config['trace_order']
     TRADE_TRIGGER = trade_config['trade_trigger']
+    MAX_ASSET_PERCENT = trade_config['max_asset_percent']
     
     FEE = train_config['fee']
     NORMALIZE_LENGTH = train_config['normalize_length']
@@ -115,7 +116,7 @@ class Trader(object):
         print('predict action for portfolio', list(zip(self.portfolio, actions)))
         total = np.sum(actions)
         if total > 0:
-            actions = actions / total
+            actions = np.clip(actions / total, 0, MAX_ASSET_PERCENT)
         actions = sorted(zip(self.portfolio, actions), key=lambda x: x[1])
         for asset, action in actions:
             re_balance(action,

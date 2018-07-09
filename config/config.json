@@ -45,7 +45,8 @@
 	"amount_discount": 2000,
 	"order_wait_interval": 0,
 	"trace_order": true,
-	"trade_trigger": 55
+	"trade_trigger": 55,
+	"max_asset_percent": 0.5
   },
   "system": {
 	"log_file": "./log/portfolio_log.csv"
