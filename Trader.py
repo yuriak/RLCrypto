@@ -147,15 +147,14 @@ if __name__ == '__main__':
         trader.init_data(TRADE_BAR_COUNT)
         trader.load_model()
         while True:
-            try:
-                if datetime.datetime.now().minute == TRADE_TRIGGER and last_trade_hour != datetime.datetime.now().hour:
-                    print("Start to trade on {0}".format(datetime.datetime.now()))
-                    last_trade_hour = datetime.datetime.now().hour
+            if datetime.datetime.now().minute == TRADE_TRIGGER and last_trade_hour != datetime.datetime.now().hour:
+                print("Start to trade on {0}".format(datetime.datetime.now()))
+                last_trade_hour = datetime.datetime.now().hour
+                try:
                     trader.init_data(TRADE_BAR_COUNT)
-                    trader.trade()
-            except Exception as e:
-                print(e)
-                pass
+                except Exception as e:
+                    trader.init_data(TRADE_BAR_COUNT)
+                trader.trade()
     elif command == 'build_model':
         trader.init_data(TRAIN_BAR_COUNT)
         trader.build_model()
