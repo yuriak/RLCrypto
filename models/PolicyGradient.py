@@ -69,7 +69,7 @@ class PolicyGradient(Model):
         if train:
             for ap in a_prob:
                 if prob:
-                    np.random.normal(loc=ap, scale=(1 - ap))
+                    ap = np.random.normal(loc=ap, scale=(1 - ap))
                     actions.append(np.exp(ap) / np.sum(np.exp(ap)))
                 else:
                     a_indices = np.arange(ap.shape[0])
