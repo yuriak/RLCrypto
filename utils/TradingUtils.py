@@ -85,36 +85,32 @@ def re_balance(target_percent,
     print("asset_balance:", asset_balance)
     
     holding_percent = asset_value / portfolio_value
-    trade_percent = target_percent - holding_percent
-    print('holding: {0}% number:{1}'.format(holding_percent, asset_balance))
+    target_amount = (portfolio_value * target_percent) / market_price
+    trade_amount = target_amount - asset_balance
+    trade_direction = 'buy' if trade_amount > 0 else 'sell'
+    trade_price = (
+        (limit_buy_price if trade_amount > 0 else limit_sell_price)
+        if order_type == 'limit' else market_price)
     
-    trade_amount = None
-    trade_direction = None
-    trade_price = None
-    if trade_percent > 0:
-        trade_amount = ((portfolio_value * trade_percent) / market_price) * (1 - amount_discount)
-        trade_direction = 'buy'
-        trade_price = limit_buy_price if order_type == 'limit' else market_price
-    elif trade_percent < 0:
-        trade_amount = ((portfolio_value * abs(trade_percent)) / market_price) * (1 - amount_discount)
-        trade_direction = 'sell'
-        trade_price = limit_sell_price if order_type == 'limit' else market_price
-    else:
-        return
-    if trade_price is None or trade_amount is None or trade_direction is None:
-        return
-    trade_amount = round(trade_amount, amount_precision)
+    trade_amount = round(abs(trade_amount), amount_precision)
+    trade_percent = abs(target_percent - holding_percent)
     if amount_precision == 0:
         trade_amount = int(trade_amount)
+    print('current holding: {0}%, amount: {1}\n'
+          'target holding: {2}%, amount: {3}\n'
+          'trade {3}%, amount: {4}\n'.format(holding_percent * 100,
+                                             asset_balance,
+                                             target_percent * 100,
+                                             target_amount,
+                                             trade_percent * 100,
+                                             trade_amount))
+    
     print("send {0}-{1} order for {2}: "
-          "target holding amount {3}, "
-          "target holding percent {4}, "
-          "on price {5}".format(order_type,
-                                trade_direction,
-                                symbol,
-                                trade_amount,
-                                target_percent,
-                                trade_price))
+          "on price {3} with amount{4}".format(order_type,
+                                               trade_direction,
+                                               symbol,
+                                               trade_price,
+                                               trade_amount))
     if not debug:
         order = send_order(symbol=symbol,
                            source='api',
