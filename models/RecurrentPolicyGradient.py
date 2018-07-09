@@ -24,7 +24,7 @@ class RecurrentPolicyGradient(Model):
         self.s_next_buffer = []
         self.dropout_keep_prob = tf.placeholder(dtype=tf.float32, shape=[], name='dropout_keep_prob')
         with tf.variable_scope('rnn_encoder', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
-            cells = add_GRUs(units_numbers=[128], acts=[tf.nn.tanh], kp=self.dropout_keep_prob)
+            cells = add_GRUs(units_numbers=[128, 128], acts=[tf.nn.tanh, tf.nn.tanh], kp=self.dropout_keep_prob)
             self.rnn_output, _ = tf.nn.dynamic_rnn(inputs=self.s, cell=cells, dtype=tf.float32)
         
         with tf.variable_scope('supervised', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
