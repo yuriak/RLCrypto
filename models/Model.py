@@ -7,11 +7,11 @@ class Model(object):
         pass
     
     @abstractmethod
-    def trade(self, asset_data_):
+    def trade(self, asset_data):
         pass
     
     @abstractmethod
-    def back_test(self, asset_data_, c, test_length):
+    def back_test(self, asset_data, c, test_length):
         pass
     
     @abstractmethod
@@ -24,8 +24,9 @@ class Model(object):
     
     @staticmethod
     @abstractmethod
-    def create_new_model(asset_data_,
+    def create_new_model(asset_data,
                          c,
+                         hidden_units_number,
                          normalize_length,
                          batch_size,
                          train_length,
