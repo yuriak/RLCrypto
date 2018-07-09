@@ -19,7 +19,7 @@
   },
   "data": {
 	"trade_bar_count": 2000,
-	"train_bar_count": 100,
+	"train_bar_count": 200,
 	"tick_interval": "60min"
   },
   "train": {
@@ -43,7 +43,9 @@
 	"order_type": "limit",
 	"price_discount": -1e-2,
 	"amount_discount": 2000,
-	"order_wait_interval": 10
+	"order_wait_interval": 0,
+	"trace_order": true,
+	"trade_trigger": 55
   },
   "system": {
 	"log_file": "./log/portfolio_log.csv"

@@ -1,6 +1,5 @@
 # -*- coding:utf-8 -*-
 import sys
-from models.Model import Model
 from models.RecurrentPolicyGradient import RecurrentPolicyGradient
 from models.PolicyGradient import PolicyGradient
 from utils.DataUtils import default_pre_process
@@ -29,6 +28,8 @@ with open(CONFIG_FILE, 'r') as f:
     PRICE_DISCOUNT = trade_config['price_discount']
     AMOUNT_DISCOUNT = trade_config['amount_discount']
     ORDER_WAIT_INTERVAL = trade_config['order_wait_interval']
+    TRACE_ORDER = trade_config['trace_order']
+    TRADE_TRIGGER = trade_config['trade_trigger']
     
     FEE = train_config['fee']
     NORMALIZE_LENGTH = train_config['normalize_length']
@@ -127,7 +128,8 @@ class Trader(object):
                        amount_discount=AMOUNT_DISCOUNT,
                        debug=DEBUG_MODE,
                        max_asset_percent=target_percent,
-                       wait_interval=ORDER_WAIT_INTERVAL)
+                       wait_interval=ORDER_WAIT_INTERVAL,
+                       trace_order=TRACE_ORDER)
         print(datetime.datetime.now())
 
 
@@ -139,9 +141,15 @@ if __name__ == '__main__':
     trader = Trader()
     trader.init_portfolio(portfolio_config=PORTFOLIO_CONFIG)
     if command == 'trade':
-        trader.init_data(TRADE_BAR_COUNT)
+        last_trade_hour = datetime.datetime.now().hour
         trader.load_model()
-        trader.trade()
+        while True:
+            if datetime.datetime.now().minute == TRADE_TRIGGER and last_trade_hour != datetime.datetime.now().hour:
+                print("Start to trade on {0}".format(datetime.datetime.now()))
+                last_trade_hour = datetime.datetime.now().hour
+                trader.init_data(TRADE_BAR_COUNT)
+                trader.trade()
+    
     elif command == 'build_model':
         trader.init_data(TRAIN_BAR_COUNT)
         trader.build_model()
