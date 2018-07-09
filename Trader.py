@@ -31,6 +31,7 @@ with open(CONFIG_FILE, 'r') as f:
     TRACE_ORDER = trade_config['trace_order']
     TRADE_TRIGGER = trade_config['trade_trigger']
     MAX_ASSET_PERCENT = trade_config['max_asset_percent']
+    MAX_ORDER_WAITING_TIME = trade_config['max_order_waiting_time']
     
     FEE = train_config['fee']
     NORMALIZE_LENGTH = train_config['normalize_length']
@@ -129,7 +130,8 @@ class Trader(object):
                        amount_discount=AMOUNT_DISCOUNT,
                        debug=DEBUG_MODE,
                        wait_interval=ORDER_WAIT_INTERVAL,
-                       trace_order=TRACE_ORDER)
+                       trace_order=TRACE_ORDER,
+                       max_order_waiting_time=MAX_ORDER_WAITING_TIME)
         print(datetime.datetime.now())
 
 

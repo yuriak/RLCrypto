@@ -38,7 +38,9 @@ def re_balance(target_percent,
                amount_discount=0.05,
                debug=True,
                wait_interval=10,
-               trace_order=False):
+               trace_order=False,
+               max_order_waiting_time=5 * 60
+               ):
     print("+" * 50)
     portfolio = portfolio + [base_currency]
     current_order_info = orders_list(symbol=symbol, states='submitted')['data']
@@ -89,7 +91,7 @@ def re_balance(target_percent,
     
     holding_percent = asset_value / portfolio_value
     target_amount = (portfolio_value * target_percent) / market_price
-    trade_amount = target_amount - asset_balance
+    trade_amount = (target_amount - asset_balance) * (1 - amount_discount)
     trade_direction = 'buy' if trade_amount > 0 else 'sell'
     trade_price = (
         (limit_buy_price if trade_amount > 0 else limit_sell_price)
@@ -102,11 +104,11 @@ def re_balance(target_percent,
     print('current holding: {0}%, amount: {1}\n'
           'target holding: {2}%, amount: {3}\n'
           'trade {4}%, amount: {5}'.format(holding_percent * 100,
-                                             asset_balance,
-                                             target_percent * 100,
-                                             target_amount,
-                                             trade_percent * 100,
-                                             trade_amount))
+                                           asset_balance,
+                                           target_percent * 100,
+                                           target_amount,
+                                           trade_percent * 100,
+                                           trade_amount))
     print("*" * 25)
     print("send {0}-{1} order for {2}: "
           "on price: {3} with amount: {4}".format(order_type,
@@ -126,12 +128,22 @@ def re_balance(target_percent,
             if order_id is not None:
                 order_filled = False
                 print("tracing order")
+                start_time = time.time()
                 while not order_filled:
                     info = order_info(order_id)
                     if info['data'] is None:
                         break
                     order_filled = (info['data']['state'] == 'filled')
                     time.sleep(wait_interval)
+                    if time.time() - start_time > max_order_waiting_time:
+                        print("exceed pending time, send market order")
+                        cancel_order(order_id)
+                        order = send_order(symbol=symbol,
+                                           source='api',
+                                           amount=trade_amount, _type=trade_direction + '-market',
+                                           price=0)
+                        print(order)
+                        return
                 print("order full filled")
                 return
         else:

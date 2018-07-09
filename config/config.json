@@ -46,7 +46,8 @@
 	"order_wait_interval": 0,
 	"trace_order": true,
 	"trade_trigger": 55,
-	"max_asset_percent": 0.5
+	"max_asset_percent": 0.5,
+	"max_order_waiting_time": 300
   },
   "system": {
 	"log_file": "./log/portfolio_log.csv"
