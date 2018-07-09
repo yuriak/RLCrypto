@@ -121,7 +121,7 @@ def re_balance(target_percent,
         return
     if target_price is None or target_amount is None or target_direction is None:
         return
-    print("send {0}-{1} order for {2}: target holding {3}, on price{4}".format(order_type, target_direction, symbol, target_amount, target_price))
+    print("send {0}-{1} order for {2}: target holding {3}, on price {4}".format(order_type, target_direction, symbol, target_amount, target_price))
     if not debug:
         order = send_order(symbol=symbol,
                            source='api',
