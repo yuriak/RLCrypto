@@ -134,7 +134,7 @@ def re_balance(target_percent,
                     if info['data'] is None:
                         break
                     order_filled = (info['data']['state'] == 'filled')
-                    time.sleep(wait_interval)
+                    time.sleep(10)
                     if time.time() - start_time > max_order_waiting_time:
                         print("exceed pending time, send market order")
                         cancel_order(order_id)
