@@ -130,20 +130,23 @@ def re_balance(target_percent,
                 print("tracing order")
                 start_time = time.time()
                 while not order_filled:
-                    info = order_info(order_id)
-                    if info['data'] is None:
-                        break
-                    order_filled = (info['data']['state'] == 'filled')
-                    time.sleep(10)
-                    if time.time() - start_time > max_order_waiting_time:
-                        print("exceed pending time, send market order")
-                        cancel_order(order_id)
-                        order = send_order(symbol=symbol,
-                                           source='api',
-                                           amount=trade_amount, _type=trade_direction + '-market',
-                                           price=0)
-                        print(order)
-                        return
+                    try:
+                        info = order_info(order_id)
+                        if info['data'] is None:
+                            break
+                        order_filled = (info['data']['state'] == 'filled')
+                        time.sleep(10)
+                        if time.time() - start_time > max_order_waiting_time:
+                            print("exceed pending time, send market order")
+                            cancel_order(order_id)
+                            order = send_order(symbol=symbol,
+                                               source='api',
+                                               amount=trade_amount, _type=trade_direction + '-market',
+                                               price=0)
+                            print(order)
+                            return
+                    except Exception as e:
+                        print(e)
                 print("order full filled")
                 return
         else:
