@@ -23,7 +23,11 @@ class PolicyGradient(Model):
         self.s_buffer = []
         self.dropout_keep_prob = tf.placeholder(dtype=tf.float32, shape=[], name='dropout_keep_prob')
         with tf.variable_scope('policy', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
-            self.a_prob = add_dense(inputs=self.s, units_numbers=hidden_units_number + [self.a_dim], acts=[tf.nn.relu] * len(hidden_units_number) + [None], kp=self.dropout_keep_prob, use_bias=True)
+            self.a_prob = add_dense(inputs=self.s,
+                                    units_numbers=hidden_units_number + [self.a_dim],
+                                    acts=[tf.nn.relu for _ in range(len(hidden_units_number))] + [None],
+                                    kp=self.dropout_keep_prob,
+                                    use_bias=True)
             self.a_out = tf.nn.softmax(self.a_prob, axis=-1)
         with tf.variable_scope('reward'):
             negative_cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.a_prob, labels=self.a)
