@@ -29,8 +29,8 @@ class RecurrentPolicyGradient(Model):
         
         with tf.variable_scope('supervised', initializer=tf.contrib.layers.xavier_initializer(uniform=True), regularizer=tf.contrib.layers.l2_regularizer(0.01)):
             self.state_predict = add_dense(inputs=self.rnn_output,
-                                           units_numbers=hidden_units_number + [self.s_dim],
-                                           acts=([tf.nn.relu for _ in range(len(hidden_units_number))] + [None]),
+                                           units_numbers=[self.s_dim],
+                                           acts=([None]),
                                            kp=self.dropout_keep_prob,
                                            use_bias=True)
             self.state_loss = tf.losses.mean_squared_error(self.state_predict, self.s_next)
