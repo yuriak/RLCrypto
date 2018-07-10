@@ -179,7 +179,7 @@ class PolicyGradient(Model):
             previous_action = action[:, 0]
         self.restore_buffer()
         print('back test_reward', np.sum(np.mean(test_reward, axis=1)))
-        return np.sum(np.mean(test_reward, axis=1))
+        return test_actions, np.sum(np.mean(test_reward, axis=1))
     
     def trade(self, asset_data):
         self.restore_buffer()
