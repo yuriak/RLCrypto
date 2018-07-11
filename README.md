@@ -33,7 +33,7 @@ The trading framework for [Huobi Exchange](https://www.huobi.pro/)
 
 ## Usage
 The interpretation of config file:
-```json
+```
 {
   "models": {
 //	hyper-parameters for PG  
