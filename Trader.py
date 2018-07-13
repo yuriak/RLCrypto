@@ -34,7 +34,7 @@ with open(CONFIG_FILE, 'r') as f:
     
     FEE = train_config['fee']
     NORMALIZE_LENGTH = train_config['normalize_length']
-    BATCH_SIZE = train_config['batch_size']
+    BATCH_LENGTH = train_config['batch_length']
     LEARNING_RATE = train_config['learning_rate']
     REWARD_THRESHOLD = train_config['reward_threshold']
     MAX_TRAINING_EPOCH = train_config['max_training_epoch']
@@ -84,7 +84,7 @@ class Trader(object):
         self.model = TRADER_MODEL(s_dim=self.asset_data.shape[-1],
                                   a_dim=2,
                                   learning_rate=LEARNING_RATE,
-                                  batch_size=BATCH_SIZE,
+                                  batch_length=BATCH_LENGTH,
                                   normalize_length=NORMALIZE_LENGTH)
         self.model.load_model(model_path=MODEL_PATH)
     
@@ -95,7 +95,7 @@ class Trader(object):
         self.model = TRADER_MODEL.create_new_model(asset_data=self.asset_data,
                                                    c=FEE,
                                                    normalize_length=NORMALIZE_LENGTH,
-                                                   batch_length=BATCH_SIZE,
+                                                   batch_length=BATCH_LENGTH,
                                                    train_length=TRAIN_LENGTH,
                                                    max_epoch=MAX_TRAINING_EPOCH,
                                                    learning_rate=LEARNING_RATE,

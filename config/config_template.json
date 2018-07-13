@@ -21,7 +21,7 @@
   "train": {
 	"fee": 1e-5,
 	"normalize_length": 10,
-	"batch_size": 64,
+	"batch_length": 64,
 	"learning_rate": 1e-3,
 	"reward_threshold": 0.3,
 	"max_training_epoch": 30,
