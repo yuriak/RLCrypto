@@ -83,7 +83,6 @@ class Trader(object):
             return
         self.model = TRADER_MODEL(s_dim=self.asset_data.shape[-1],
                                   a_dim=2,
-                                  hidden_units_number=HYPER_PARAMETERS['hidden_units_number'],
                                   learning_rate=LEARNING_RATE,
                                   batch_size=BATCH_SIZE,
                                   normalize_length=NORMALIZE_LENGTH)
@@ -95,7 +94,6 @@ class Trader(object):
             return
         self.model = TRADER_MODEL.create_new_model(asset_data=self.asset_data,
                                                    c=FEE,
-                                                   hidden_units_number=HYPER_PARAMETERS['hidden_units_number'],
                                                    normalize_length=NORMALIZE_LENGTH,
                                                    batch_size=BATCH_SIZE,
                                                    train_length=TRAIN_LENGTH,
