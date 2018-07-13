@@ -1,10 +1,10 @@
 {
   "models": {
 	"PG_TF": {
-	  "model_path": "./model_backup/PolicyGradient"
+	  "model_path": "./model_backup/PG_TF"
 	},
 	"RPG_TF": {
-	  "model_path": "./model_backup/RecurrentPolicyGradient"
+	  "model_path": "./model_backup/RPG_TF"
 	},
 	"PG_Torch":{
 	  "model_path":"./model_backup/PG_Torch"

@@ -6,9 +6,9 @@ from models.Model import Model
 from models.layers import *
 
 
-class RecurrentPolicyGradient(Model):
+class RPG_TF(Model):
     def __init__(self, s_dim, a_dim=2, hidden_units_number=[128, 64], rnn_units_number=[128, 128], learning_rate=0.001, batch_size=64, normalize_length=10):
-        super(RecurrentPolicyGradient, self).__init__()
+        super(RPG_TF, self).__init__()
         tf.reset_default_graph()
         self.s = tf.placeholder(dtype=tf.float32, shape=[None, None, s_dim], name='s')
         self.a = tf.placeholder(dtype=tf.int32, shape=[None, None, a_dim], name='a')
@@ -112,10 +112,10 @@ class RecurrentPolicyGradient(Model):
                 actions.append(a)
             return np.array(actions)
     
-    def load_model(self, model_path='./RecurrentPolicyGradient'):
+    def load_model(self, model_path='./RPG_TF'):
         self.saver.restore(self.session, model_path + '/model')
     
-    def save_model(self, model_path='./RecurrentPolicyGradient'):
+    def save_model(self, model_path='./RPG_TF'):
         if not os.path.exists(model_path):
             os.mkdir(model_path)
         model_file = model_path + '/model'
@@ -124,7 +124,6 @@ class RecurrentPolicyGradient(Model):
     @staticmethod
     def create_new_model(asset_data,
                          c,
-                         hidden_units_number,
                          normalize_length,
                          batch_size,
                          train_length,
@@ -135,12 +134,11 @@ class RecurrentPolicyGradient(Model):
         current_model_reward = -np.inf
         model = None
         while current_model_reward < pass_threshold:
-            model = RecurrentPolicyGradient(s_dim=asset_data.shape[2],
-                                            a_dim=2,
-                                            hidden_units_number=hidden_units_number,
-                                            learning_rate=learning_rate,
-                                            batch_size=batch_size,
-                                            normalize_length=normalize_length)
+            model = RPG_TF(s_dim=asset_data.shape[2],
+                           a_dim=2,
+                           learning_rate=learning_rate,
+                           batch_size=batch_size,
+                           normalize_length=normalize_length)
             model.init_model()
             model.restore_buffer()
             train_mean_r = []

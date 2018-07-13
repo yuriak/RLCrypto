@@ -1,7 +1,6 @@
 # -*- coding:utf-8 -*-
 import sys
-from models.RPG_TF import RecurrentPolicyGradient
-from models.PG_TF import PolicyGradient
+import importlib
 from utils.DataUtils import default_pre_process
 from utils.TradingUtils import *
 
@@ -48,10 +47,7 @@ with open(CONFIG_FILE, 'r') as f:
     TICK_INTERVAL = data_config['tick_interval']
     
     MODEL_TYPE = trade_config['model_type']
-    if MODEL_TYPE == 'RecurrentPolicyGradient':
-        TRADER_MODEL = RecurrentPolicyGradient
-    else:
-        TRADER_MODEL = PolicyGradient
+    TRADER_MODEL = getattr(importlib.import_module("models.{0}".format(MODEL_TYPE)), MODEL_TYPE)
     HYPER_PARAMETERS = model_config[MODEL_TYPE]
     MODEL_PATH = HYPER_PARAMETERS['model_path']
 
@@ -108,6 +104,12 @@ class Trader(object):
                                                    pass_threshold=REWARD_THRESHOLD,
                                                    model_path=MODEL_PATH)
     
+    def backtest(self):
+        if len(self.portfolio) == 0 or self.asset_data is None:
+            print("Init data first")
+            return
+        self.model.back_test(asset_data=self.asset_data, c=FEE, test_length=TEST_LENGTH)
+    
     def trade(self):
         print('=' * 100)
         if len(self.portfolio) == 0 or self.asset_data is None or self.model is None:
@@ -158,6 +160,10 @@ if __name__ == '__main__':
     elif command == 'build_model':
         trader.init_data(TRAIN_BAR_COUNT)
         trader.build_model()
+    elif command == 'backtest':
+        trader.init_data(TRAIN_BAR_COUNT)
+        trader.load_model()
+        trader.backtest()
     else:
         print('invalid command')
         # Donate XMR:   4AUY1FEpfGtYutRShAsmTMbVFmLoZdL92Gg6fQPYsN1P61mqrZpgnmsQKtYM8CkFpvDMJS6MuuKmncHhSpUtRyEqGcNUht2

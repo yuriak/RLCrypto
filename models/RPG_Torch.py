@@ -48,7 +48,7 @@ class PolicyNetwork(nn.Module):
         return pn_out, sn_out, h.data
 
 
-class RecurrentPolicyGradient(Model):
+class RPG_Torch(Model):
     def __init__(self, s_dim, a_dim, b_dim, batch_length=64, learning_rate=1e-3, rnn_layers=1, normalize_length=10):
         self.s_dim = s_dim
         self.a_dim = a_dim
@@ -117,10 +117,10 @@ class RecurrentPolicyGradient(Model):
             param.grad.data.clamp_(-1, 1)
         self.optimizer.step()
     
-    def load_model(self, model_path='./RecurrentPolicyGradient_Torch'):
+    def load_model(self, model_path='./RPG_Torch'):
         self.policy = torch.load(model_path + '/model.pkl')
     
-    def save_model(self, model_path='./RecurrentPolicyGradient_Torch'):
+    def save_model(self, model_path='./RPG_Torch'):
         if not os.path.exists(model_path):
             os.mkdir(model_path)
         torch.save(self.policy, model_path + '/model.pkl')
@@ -165,7 +165,6 @@ class RecurrentPolicyGradient(Model):
     @staticmethod
     def create_new_model(asset_data,
                          c,
-                         hidden_units_number,
                          normalize_length,
                          batch_length,
                          train_length,
@@ -176,13 +175,13 @@ class RecurrentPolicyGradient(Model):
         current_model_reward = -np.inf
         model = None
         while current_model_reward < pass_threshold:
-            model = RecurrentPolicyGradient(s_dim=asset_data.shape[2],
-                                            a_dim=2,
-                                            b_dim=asset_data.shape[0],
-                                            batch_length=batch_length,
-                                            learning_rate=learning_rate,
-                                            rnn_layers=1,
-                                            normalize_length=normalize_length)
+            model = RPG_Torch(s_dim=asset_data.shape[2],
+                              a_dim=2,
+                              b_dim=asset_data.shape[0],
+                              batch_length=batch_length,
+                              learning_rate=learning_rate,
+                              rnn_layers=1,
+                              normalize_length=normalize_length)
             model.reset_model()
             for e in range(max_epoch):
                 train_reward = []

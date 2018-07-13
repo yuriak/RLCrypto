@@ -26,7 +26,6 @@ class Model(object):
     @abstractmethod
     def create_new_model(asset_data,
                          c,
-                         hidden_units_number,
                          normalize_length,
                          batch_size,
                          train_length,
