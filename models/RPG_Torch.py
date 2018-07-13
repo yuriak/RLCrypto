@@ -28,10 +28,7 @@ class PolicyNetwork(nn.Module):
         self.initial_hidden = torch.zeros(self.rnn_layers, self.b_dim, 128, dtype=torch.float32)
     
     def forward(self, state, hidden=None, train=False):
-        if hidden is None:
-            state, h = self.gru(state, self.initial_hidden)
-        else:
-            state, h = self.gru(state, hidden)
+        state, h = self.gru(state, hidden)
         if train:
             state = self.dropout(state)
         sn_out = self.relu(self.fc_s_1(state))
@@ -48,7 +45,7 @@ class PolicyNetwork(nn.Module):
         return pn_out, sn_out, h.data
 
 
-class RecurrentPolicyGradient(Model):
+class RPG_Torch(Model):
     def __init__(self, s_dim, a_dim, b_dim, batch_length=64, learning_rate=1e-3, rnn_layers=1, normalize_length=10):
         self.s_dim = s_dim
         self.a_dim = a_dim
@@ -74,12 +71,27 @@ class RecurrentPolicyGradient(Model):
         else:
             return a[:, 0, :].argmax(dim=1)
     
+    def _train(self):
+        self.optimizer.zero_grad()
+        s = torch.stack(self.s_buffer).t()
+        s_next = torch.stack(self.s_next_buffer).t()
+        r = torch.stack(self.r_buffer).t()
+        a = torch.stack(self.a_buffer).t()
+        a_hat, s_next_hat, self.train_hidden = self.policy(s, self.train_hidden, train=True)
+        mse_loss = torch.nn.functional.mse_loss(s_next_hat, s_next)
+        nll = -torch.log(a_hat.gather(2, a))
+        pg_loss = (nll * r).mean()
+        loss = mse_loss + pg_loss
+        loss.backward()
+        for param in self.policy.parameters():
+            param.grad.data.clamp_(-1, 1)
+        self.optimizer.step()
+    
     def reset_model(self):
         self.s_buffer = []
         self.a_buffer = []
         self.s_next_buffer = []
         self.r_buffer = []
-        self.policy.reset_hidden()
         self.trade_hidden = None
         self.train_hidden = None
         self.pointer = 0
@@ -101,31 +113,39 @@ class RecurrentPolicyGradient(Model):
             self.r_buffer.append(torch.tensor(reward[:, None], dtype=torch.float32))
             self.s_next_buffer.append(next_state)
     
-    def _train(self):
-        self.optimizer.zero_grad()
-        s = torch.stack(self.s_buffer).t()
-        s_next = torch.stack(self.s_next_buffer).t()
-        r = torch.stack(self.r_buffer).t()
-        a = torch.stack(self.a_buffer).t()
-        a_hat, s_next_hat, self.train_hidden = self.policy(s, self.train_hidden, train=True)
-        mse_loss = torch.nn.functional.mse_loss(s_next_hat, s_next)
-        nll = -torch.log(a_hat.gather(2, a))
-        pg_loss = (nll * r).mean()
-        loss = mse_loss + pg_loss
-        loss.backward()
-        for param in self.policy.parameters():
-            param.grad.data.clamp_(-1, 1)
-        self.optimizer.step()
-    
-    def load_model(self, model_path='./RecurrentPolicyGradient_Torch'):
+    def load_model(self, model_path='./RPG_Torch'):
         self.policy = torch.load(model_path + '/model.pkl')
     
-    def save_model(self, model_path='./RecurrentPolicyGradient_Torch'):
+    def save_model(self, model_path='./RPG_Torch'):
         if not os.path.exists(model_path):
             os.mkdir(model_path)
         torch.save(self.policy, model_path + '/model.pkl')
     
-    def back_test(self, asset_data, c, test_length):
+    def train(self, asset_data, c, train_length, epoch=0):
+        self.reset_model()
+        previous_action = np.zeros(asset_data.shape[0])
+        train_reward = []
+        train_actions = []
+        for t in range(self.normalize_length, train_length):
+            data = asset_data[:, t - self.normalize_length:t, :].values
+            state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
+            state = torch.tensor(state)
+            next_state = asset_data[:, :, 'diff'].iloc[t].values
+            next_state = torch.tensor(next_state)[:, None]
+            action = self._trade(state, train=True)
+            action_np = action.numpy().flatten()
+            r = asset_data[:, :, 'diff'].iloc[t].values * action_np - c * np.abs(previous_action - action_np)
+            self.save_transition(state=state, action=action, next_state=next_state, reward=r)
+            train_reward.append(r)
+            train_actions.append(action_np)
+            previous_action = action_np
+            if t % self.batch_length == 0:
+                self._train()
+        self.reset_model()
+        print(epoch, 'train_reward', np.sum(np.mean(train_reward, axis=1)), np.mean(train_reward))
+        return train_reward, train_actions
+    
+    def back_test(self, asset_data, c, test_length, epoch=0):
         self.reset_model()
         previous_action = np.zeros(asset_data.shape[0])
         test_reward = []
@@ -138,11 +158,11 @@ class RecurrentPolicyGradient(Model):
             action_np = action.numpy().flatten()
             r = asset_data[:, :, 'diff'].iloc[t].values * action_np - c * np.abs(previous_action - action_np)
             test_reward.append(r)
-            test_actions.append(action)
+            test_actions.append(action_np)
             previous_action = action_np
         self.reset_model()
-        print('back test_reward', np.sum(np.mean(test_reward, axis=1)))
-        return test_actions, test_reward
+        print(epoch, 'backtest reward', np.sum(np.mean(test_reward, axis=1)), np.mean(test_reward))
+        return test_reward, test_actions
     
     def trade(self, asset_data):
         if self.trade_hidden is None:
@@ -165,7 +185,6 @@ class RecurrentPolicyGradient(Model):
     @staticmethod
     def create_new_model(asset_data,
                          c,
-                         hidden_units_number,
                          normalize_length,
                          batch_length,
                          train_length,
@@ -176,32 +195,16 @@ class RecurrentPolicyGradient(Model):
         current_model_reward = -np.inf
         model = None
         while current_model_reward < pass_threshold:
-            model = RecurrentPolicyGradient(s_dim=asset_data.shape[2],
-                                            a_dim=2,
-                                            b_dim=asset_data.shape[0],
-                                            batch_length=batch_length,
-                                            learning_rate=learning_rate,
-                                            rnn_layers=1,
-                                            normalize_length=normalize_length)
+            model = RPG_Torch(s_dim=asset_data.shape[2],
+                              a_dim=2,
+                              b_dim=asset_data.shape[0],
+                              batch_length=batch_length,
+                              learning_rate=learning_rate,
+                              rnn_layers=1,
+                              normalize_length=normalize_length)
             model.reset_model()
             for e in range(max_epoch):
-                train_reward = []
-                previous_action = np.zeros(asset_data.shape[0])
-                for t in range(model.normalize_length, train_length):
-                    data = asset_data[:, t - normalize_length:t, :].values
-                    state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
-                    state = torch.tensor(state)
-                    next_state = asset_data[:, :, 'diff'].iloc[t].values
-                    next_state = torch.tensor(next_state)[:, None]
-                    action = model._trade(state, train=True)
-                    action_np = action.numpy().flatten()
-                    r = asset_data[:, :, 'diff'].iloc[t].values * action_np - c * np.abs(previous_action - action_np)
-                    model.save_transition(state=state, action=action, next_state=next_state, reward=r)
-                    train_reward.append(r)
-                    previous_action = action_np
-                    if t % batch_length == 0:
-                        model._train()
-                print(e, 'train_reward', np.sum(np.mean(train_reward, axis=1)), np.mean(train_reward))
+                train_reward, train_actions = model.train(asset_data, c=c, train_length=train_length, epoch=e)
                 test_actions, test_reward = model.back_test(asset_data, c=c, test_length=asset_data.shape[1] - train_length)
                 current_model_reward = np.sum(np.mean(test_reward, axis=1))
                 if current_model_reward > pass_threshold:

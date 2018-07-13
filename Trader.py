@@ -1,7 +1,6 @@
 # -*- coding:utf-8 -*-
 import sys
-from models.RPG_TF import RecurrentPolicyGradient
-from models.PG_TF import PolicyGradient
+import importlib
 from utils.DataUtils import default_pre_process
 from utils.TradingUtils import *
 
@@ -35,7 +34,7 @@ with open(CONFIG_FILE, 'r') as f:
     
     FEE = train_config['fee']
     NORMALIZE_LENGTH = train_config['normalize_length']
-    BATCH_SIZE = train_config['batch_size']
+    BATCH_LENGTH = train_config['batch_length']
     LEARNING_RATE = train_config['learning_rate']
     REWARD_THRESHOLD = train_config['reward_threshold']
     MAX_TRAINING_EPOCH = train_config['max_training_epoch']
@@ -48,10 +47,7 @@ with open(CONFIG_FILE, 'r') as f:
     TICK_INTERVAL = data_config['tick_interval']
     
     MODEL_TYPE = trade_config['model_type']
-    if MODEL_TYPE == 'RecurrentPolicyGradient':
-        TRADER_MODEL = RecurrentPolicyGradient
-    else:
-        TRADER_MODEL = PolicyGradient
+    TRADER_MODEL = getattr(importlib.import_module("models.{0}".format(MODEL_TYPE)), MODEL_TYPE)
     HYPER_PARAMETERS = model_config[MODEL_TYPE]
     MODEL_PATH = HYPER_PARAMETERS['model_path']
 
@@ -86,10 +82,10 @@ class Trader(object):
             print('Init data first')
             return
         self.model = TRADER_MODEL(s_dim=self.asset_data.shape[-1],
+                                  b_dim=self.asset_data.shape[0],
                                   a_dim=2,
-                                  hidden_units_number=HYPER_PARAMETERS['hidden_units_number'],
                                   learning_rate=LEARNING_RATE,
-                                  batch_size=BATCH_SIZE,
+                                  batch_length=BATCH_LENGTH,
                                   normalize_length=NORMALIZE_LENGTH)
         self.model.load_model(model_path=MODEL_PATH)
     
@@ -99,14 +95,19 @@ class Trader(object):
             return
         self.model = TRADER_MODEL.create_new_model(asset_data=self.asset_data,
                                                    c=FEE,
-                                                   hidden_units_number=HYPER_PARAMETERS['hidden_units_number'],
                                                    normalize_length=NORMALIZE_LENGTH,
-                                                   batch_size=BATCH_SIZE,
+                                                   batch_length=BATCH_LENGTH,
                                                    train_length=TRAIN_LENGTH,
                                                    max_epoch=MAX_TRAINING_EPOCH,
                                                    learning_rate=LEARNING_RATE,
                                                    pass_threshold=REWARD_THRESHOLD,
                                                    model_path=MODEL_PATH)
+    
+    def back_test(self):
+        if len(self.portfolio) == 0 or self.asset_data is None:
+            print("Init data first")
+            return
+        self.model.back_test(asset_data=self.asset_data, c=FEE, test_length=TEST_LENGTH)
     
     def trade(self):
         print('=' * 100)
@@ -155,9 +156,21 @@ if __name__ == '__main__':
                 except Exception as e:
                     trader.init_data(TRADE_BAR_COUNT)
                 trader.trade()
+    elif command == 'trade_now':
+        try:
+            trader.init_data(TRADE_BAR_COUNT)
+        except Exception:
+            trader.init_data(TRADE_BAR_COUNT)
+        trader.load_model()
+        trader.trade()
+        
     elif command == 'build_model':
         trader.init_data(TRAIN_BAR_COUNT)
         trader.build_model()
+    elif command == 'backtest':
+        trader.init_data(TRAIN_BAR_COUNT)
+        trader.load_model()
+        trader.back_test()
     else:
         print('invalid command')
         # Donate XMR:   4AUY1FEpfGtYutRShAsmTMbVFmLoZdL92Gg6fQPYsN1P61mqrZpgnmsQKtYM8CkFpvDMJS6MuuKmncHhSpUtRyEqGcNUht2
