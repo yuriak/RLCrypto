@@ -82,6 +82,7 @@ class Trader(object):
             print('Init data first')
             return
         self.model = TRADER_MODEL(s_dim=self.asset_data.shape[-1],
+                                  b_dim=self.asset_data.shape[0],
                                   a_dim=2,
                                   learning_rate=LEARNING_RATE,
                                   batch_length=BATCH_LENGTH,

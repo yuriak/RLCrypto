@@ -7,7 +7,7 @@ from models.layers import *
 
 
 class RPG_TF(Model):
-    def __init__(self, s_dim, a_dim=2, hidden_units_number=[128, 64], rnn_units_number=[128, 128], learning_rate=0.001, batch_size=64, normalize_length=10):
+    def __init__(self, s_dim, b_dim, a_dim=2, hidden_units_number=[128, 64], rnn_units_number=[128, 128], learning_rate=0.001, batch_size=64, normalize_length=10):
         super(RPG_TF, self).__init__()
         tf.reset_default_graph()
         self.s = tf.placeholder(dtype=tf.float32, shape=[None, None, s_dim], name='s')
@@ -16,6 +16,7 @@ class RPG_TF(Model):
         self.s_next = tf.placeholder(dtype=tf.float32, shape=[None, None, s_dim], name='s_next')
         self.a_dim = a_dim
         self.s_dim = s_dim
+        self.b_dim = b_dim
         self.batch_size = batch_size
         self.normalize_length = normalize_length
         self.a_buffer = []
@@ -135,6 +136,7 @@ class RPG_TF(Model):
         model = None
         while current_model_reward < pass_threshold:
             model = RPG_TF(s_dim=asset_data.shape[2],
+                           b_dim=asset_data.shape[0],
                            a_dim=2,
                            learning_rate=learning_rate,
                            batch_size=batch_length,
