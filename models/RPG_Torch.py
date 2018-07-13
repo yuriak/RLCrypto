@@ -145,7 +145,7 @@ class RPG_Torch(Model):
         print(epoch, 'train_reward', np.sum(np.mean(train_reward, axis=1)), np.mean(train_reward))
         return train_reward, train_actions
     
-    def back_test(self, asset_data, c, test_length):
+    def back_test(self, asset_data, c, test_length,epoch=0):
         self.reset_model()
         previous_action = np.zeros(asset_data.shape[0])
         test_reward = []
@@ -158,10 +158,10 @@ class RPG_Torch(Model):
             action_np = action.numpy().flatten()
             r = asset_data[:, :, 'diff'].iloc[t].values * action_np - c * np.abs(previous_action - action_np)
             test_reward.append(r)
-            test_actions.append(action)
+            test_actions.append(action_np)
             previous_action = action_np
         self.reset_model()
-        print('back test_reward', np.sum(np.mean(test_reward, axis=1)))
+        print(epoch,'backtest reward', np.sum(np.mean(test_reward, axis=1)))
         return test_reward, test_actions
     
     def trade(self, asset_data):
