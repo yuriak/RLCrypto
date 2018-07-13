@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 import sys
-from models.RecurrentPolicyGradient import RecurrentPolicyGradient
-from models.PolicyGradient import PolicyGradient
+from models.RPG_TF import RecurrentPolicyGradient
+from models.PG_TF import PolicyGradient
 from utils.DataUtils import default_pre_process
 from utils.TradingUtils import *
 

@@ -1,20 +1,16 @@
 {
   "models": {
-	"PolicyGradient": {
-	  "hidden_units_number": [
-		256,
-		128,
-		128,
-		64
-	  ],
+	"PG_TF": {
 	  "model_path": "./model_backup/PolicyGradient"
 	},
-	"RecurrentPolicyGradient": {
-	  "hidden_units_number": [
-		128,
-		64
-	  ],
+	"RPG_TF": {
 	  "model_path": "./model_backup/RecurrentPolicyGradient"
+	},
+	"PG_Torch":{
+	  "model_path":"./model_backup/PG_Torch"
+	},
+	"RPG_Torch":{
+	  "model_path":"./model_backup/RPG_Torch"
 	}
   },
   "data": {
@@ -35,19 +31,19 @@
 	"test_length": 400
   },
   "trade": {
-	"base_currency": "eth",
+	"base_currency": "btc",
 	"debug_mode": true,
 	"portfolio_config": "./config/portfolio_config.json",
-	"model_type": "PolicyGradient",
+	"model_type": "RPG_Torch",
 	"account_file": "./config/account.json",
 	"order_type": "limit",
-	"price_discount": -1e-3,
-	"amount_discount": 0.05,
+	"price_discount": -5e-3,
+	"amount_discount": 0.09,
 	"order_wait_interval": 0,
 	"trace_order": true,
 	"trade_trigger": 55,
-	"max_asset_percent": 0.5,
-	"max_order_waiting_time": 300
+	"max_asset_percent": 0.4,
+	"max_order_waiting_time": 120
   },
   "system": {
 	"log_file": "./log/portfolio_log.csv"
