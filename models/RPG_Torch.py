@@ -15,21 +15,12 @@ class PolicyNetwork(nn.Module):
         self.b_dim = b_dim
         self.rnn_layers = rnn_layers
         self.gru = nn.GRU(self.s_dim, 128, self.rnn_layers, batch_first=True)
-        # for l in self.gru.all_weights:
-        #     for w in l[:2]:
-        #         torch.nn.init.xavier_uniform_(w)
         self.fc_s_1 = nn.Linear(128, 128)
-        # torch.nn.init.xavier_uniform_(self.fc_s_1.weight)
         self.fc_s_2 = nn.Linear(128, 64)
-        # torch.nn.init.xavier_uniform_(self.fc_s_2.weight)
         self.fc_s_out = nn.Linear(64, 1)
-        # torch.nn.init.xavier_uniform_(self.fc_s_out.weight)
         self.fc_pg_1 = nn.Linear(128, 128)
-        # torch.nn.init.xavier_uniform_(self.fc_pg_1.weight)
         self.fc_pg_2 = nn.Linear(128, 64)
-        # torch.nn.init.xavier_uniform_(self.fc_pg_2.weight)
         self.fc_pg_out = nn.Linear(64, self.a_dim)
-        # torch.nn.init.xavier_uniform_(self.fc_pg_out.weight)
         self.relu = nn.ReLU()
         self.tanh = nn.Tanh()
         self.dropout = nn.Dropout(p=dp)
