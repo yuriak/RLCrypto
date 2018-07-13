@@ -166,7 +166,7 @@ class RPG_Torch(Model):
             previous_action = action_np
         self.reset_model()
         print('back test_reward', np.sum(np.mean(test_reward, axis=1)))
-        return test_actions, test_reward
+        return test_reward, test_reward
     
     def trade(self, asset_data):
         if self.trade_hidden is None:
