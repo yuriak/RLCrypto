@@ -104,7 +104,7 @@ class Trader(object):
                                                    pass_threshold=REWARD_THRESHOLD,
                                                    model_path=MODEL_PATH)
     
-    def backtest(self):
+    def back_test(self):
         if len(self.portfolio) == 0 or self.asset_data is None:
             print("Init data first")
             return
@@ -163,7 +163,7 @@ if __name__ == '__main__':
     elif command == 'backtest':
         trader.init_data(TRAIN_BAR_COUNT)
         trader.load_model()
-        trader.backtest()
+        trader.back_test()
     else:
         print('invalid command')
         # Donate XMR:   4AUY1FEpfGtYutRShAsmTMbVFmLoZdL92Gg6fQPYsN1P61mqrZpgnmsQKtYM8CkFpvDMJS6MuuKmncHhSpUtRyEqGcNUht2
