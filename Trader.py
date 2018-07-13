@@ -157,6 +157,14 @@ if __name__ == '__main__':
                 except Exception as e:
                     trader.init_data(TRADE_BAR_COUNT)
                 trader.trade()
+    elif command == 'trade_now':
+        try:
+            trader.init_data(TRADE_BAR_COUNT)
+        except Exception:
+            trader.init_data(TRADE_BAR_COUNT)
+        trader.load_model()
+        trader.trade()
+        
     elif command == 'build_model':
         trader.init_data(TRAIN_BAR_COUNT)
         trader.build_model()
