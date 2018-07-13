@@ -95,7 +95,7 @@ class Trader(object):
         self.model = TRADER_MODEL.create_new_model(asset_data=self.asset_data,
                                                    c=FEE,
                                                    normalize_length=NORMALIZE_LENGTH,
-                                                   batch_size=BATCH_SIZE,
+                                                   batch_length=BATCH_SIZE,
                                                    train_length=TRAIN_LENGTH,
                                                    max_epoch=MAX_TRAINING_EPOCH,
                                                    learning_rate=LEARNING_RATE,

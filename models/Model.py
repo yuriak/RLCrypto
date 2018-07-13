@@ -27,7 +27,7 @@ class Model(object):
     def create_new_model(asset_data,
                          c,
                          normalize_length,
-                         batch_size,
+                         batch_length,
                          train_length,
                          max_epoch,
                          learning_rate,

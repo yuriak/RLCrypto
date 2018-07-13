@@ -125,7 +125,7 @@ class RPG_TF(Model):
     def create_new_model(asset_data,
                          c,
                          normalize_length,
-                         batch_size,
+                         batch_length,
                          train_length,
                          max_epoch,
                          learning_rate,
@@ -137,7 +137,7 @@ class RPG_TF(Model):
             model = RPG_TF(s_dim=asset_data.shape[2],
                            a_dim=2,
                            learning_rate=learning_rate,
-                           batch_size=batch_size,
+                           batch_size=batch_length,
                            normalize_length=normalize_length)
             model.init_model()
             model.restore_buffer()
