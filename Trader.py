@@ -147,6 +147,7 @@ if __name__ == '__main__':
         last_trade_hour = None
         trader.init_data(TRADE_BAR_COUNT)
         trader.load_model()
+        print("Waiting to trade when triggered")
         while True:
             if datetime.datetime.now().minute == TRADE_TRIGGER and last_trade_hour != datetime.datetime.now().hour:
                 print("Start to trade on {0}".format(datetime.datetime.now()))
