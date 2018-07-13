@@ -28,10 +28,7 @@ class PolicyNetwork(nn.Module):
         self.initial_hidden = torch.zeros(self.rnn_layers, self.b_dim, 128, dtype=torch.float32)
     
     def forward(self, state, hidden=None, train=False):
-        if hidden is None:
-            state, h = self.gru(state, self.initial_hidden)
-        else:
-            state, h = self.gru(state, hidden)
+        state, h = self.gru(state, hidden)
         if train:
             state = self.dropout(state)
         sn_out = self.relu(self.fc_s_1(state))
@@ -95,7 +92,6 @@ class RPG_Torch(Model):
         self.a_buffer = []
         self.s_next_buffer = []
         self.r_buffer = []
-        self.policy.reset_hidden()
         self.trade_hidden = None
         self.train_hidden = None
         self.pointer = 0
