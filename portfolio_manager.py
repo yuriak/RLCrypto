@@ -91,8 +91,7 @@ class PortfolioManager(object):
         self.trader.re_balance(actions=actions)
         print(datetime.datetime.now())
 
-    
-    
+
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         print('Please input command')
