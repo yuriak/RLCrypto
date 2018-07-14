@@ -3,53 +3,13 @@ import sys
 import importlib
 from utils.DataUtils import default_pre_process
 from utils.TradingUtils import *
+from utils.config import *
 
-CONFIG_FILE = './config/config.json'
-if not os.path.exists(CONFIG_FILE):
+CONFIG_PATH = './config/config.json'
+if not os.path.exists(CONFIG_PATH):
     print("config file doesn't exist")
     sys.exit(1)
-with open(CONFIG_FILE, 'r') as f:
-    config = json.loads(f.read())
-    system_config = config['system']
-    model_config = config['models']
-    trade_config = config['trade']
-    train_config = config['train']
-    test_config = config['test']
-    data_config = config['data']
-    
-    LOG_FILE = system_config['log_file']
-    
-    BASE_CURRENCY = trade_config['base_currency']
-    DEBUG_MODE = trade_config['debug_mode']
-    PORTFOLIO_CONFIG = trade_config['portfolio_config']
-    ACCOUNT_FILE = trade_config['account_file']
-    ORDER_TYPE = trade_config['order_type']
-    PRICE_DISCOUNT = trade_config['price_discount']
-    AMOUNT_DISCOUNT = trade_config['amount_discount']
-    ORDER_WAIT_INTERVAL = trade_config['order_wait_interval']
-    TRACE_ORDER = trade_config['trace_order']
-    TRADE_TRIGGER = trade_config['trade_trigger']
-    MAX_ASSET_PERCENT = trade_config['max_asset_percent']
-    MAX_ORDER_WAITING_TIME = trade_config['max_order_waiting_time']
-    
-    FEE = train_config['fee']
-    NORMALIZE_LENGTH = train_config['normalize_length']
-    BATCH_LENGTH = train_config['batch_length']
-    LEARNING_RATE = train_config['learning_rate']
-    REWARD_THRESHOLD = train_config['reward_threshold']
-    MAX_TRAINING_EPOCH = train_config['max_training_epoch']
-    TRAIN_LENGTH = train_config['train_length']
-    
-    TEST_LENGTH = test_config['test_length']
-    
-    TRAIN_BAR_COUNT = data_config['train_bar_count']
-    TRADE_BAR_COUNT = data_config['trade_bar_count']
-    TICK_INTERVAL = data_config['tick_interval']
-    
-    MODEL_TYPE = trade_config['model_type']
-    TRADER_MODEL = getattr(importlib.import_module("models.{0}".format(MODEL_TYPE)), MODEL_TYPE)
-    HYPER_PARAMETERS = model_config[MODEL_TYPE]
-    MODEL_PATH = HYPER_PARAMETERS['model_path']
+init_config(CONFIG_PATH)
 
 init_account(ACCOUNT_FILE)
 print(get_accounts())
