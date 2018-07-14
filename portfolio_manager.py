@@ -1,9 +1,9 @@
 # -*- coding:utf-8 -*-
 import sys
-import importlib
 from utils.DataUtils import default_pre_process
 from utils.TradingUtils import *
 from utils.config import *
+from portfolio_manager import Trader
 
 CONFIG_PATH = './config/config.json'
 if not os.path.exists(CONFIG_PATH):
@@ -11,21 +11,22 @@ if not os.path.exists(CONFIG_PATH):
     sys.exit(1)
 init_config(CONFIG_PATH)
 
-init_account(ACCOUNT_FILE)
+init_account(account_file)
 print(get_accounts())
 
 
-class Trader(object):
+class PortfolioManager(object):
     def __init__(self):
         self.portfolio = []
         self.asset_data = None
         self.model = None
+        self.trader = None
     
-    def init_portfolio(self, portfolio_config):
-        if not os.path.exists(portfolio_config):
-            print('Portfolio config file doesn\'t exist, run PortfolioManager first')
+    def init_assets(self, assets_config):
+        if not os.path.exists(assets_config):
+            print('Portfolio config file does not exist, run PortfolioManager first')
             return
-        with open(portfolio_config, 'r') as f:
+        with open(assets_config, 'r') as f:
             print('Load portfolio successfully')
             self.portfolio = json.loads(f.read())
     
@@ -33,41 +34,52 @@ class Trader(object):
         if len(self.portfolio) == 0:
             print('Load portfolio first')
             return
-        asset_data = klines(self.portfolio, base_currency=BASE_CURRENCY, interval=TICK_INTERVAL, count=bar_count)
+        asset_data = klines(self.portfolio, base_currency=base_currency, interval=tick_interval, count=bar_count)
         asset_data = default_pre_process(asset_data)
         self.asset_data = asset_data
+    
+    def init_trader(self):
+        self.trader = Trader(assets=self.portfolio,
+                             base_currency=base_currency,
+                             max_asset_percent=max_asset_percent,
+                             max_order_waiting_time=max_order_waiting_time,
+                             price_discount=price_discount,
+                             amount_discount=amount_discount,
+                             order_type=order_type,
+                             trace_order=trace_order,
+                             debug_mode=debug_mode)
     
     def load_model(self):
         if len(self.portfolio) == 0 or self.asset_data is None:
             print('Init data first')
             return
-        self.model = TRADER_MODEL(s_dim=self.asset_data.shape[-1],
-                                  b_dim=self.asset_data.shape[0],
-                                  a_dim=2,
-                                  learning_rate=LEARNING_RATE,
-                                  batch_length=BATCH_LENGTH,
-                                  normalize_length=NORMALIZE_LENGTH)
-        self.model.load_model(model_path=MODEL_PATH)
+        self.model = agent(s_dim=self.asset_data.shape[-1],
+                           b_dim=self.asset_data.shape[0],
+                           a_dim=2,
+                           learning_rate=learning_rate,
+                           batch_length=batch_length,
+                           normalize_length=normalize_length)
+        self.model.load_model(model_path=model_path)
     
     def build_model(self):
         if len(self.portfolio) == 0 or self.asset_data is None:
             print('Init data first')
             return
-        self.model = TRADER_MODEL.create_new_model(asset_data=self.asset_data,
-                                                   c=FEE,
-                                                   normalize_length=NORMALIZE_LENGTH,
-                                                   batch_length=BATCH_LENGTH,
-                                                   train_length=TRAIN_LENGTH,
-                                                   max_epoch=MAX_TRAINING_EPOCH,
-                                                   learning_rate=LEARNING_RATE,
-                                                   pass_threshold=REWARD_THRESHOLD,
-                                                   model_path=MODEL_PATH)
+        self.model = agent.create_new_model(asset_data=self.asset_data,
+                                            c=fee,
+                                            normalize_length=normalize_length,
+                                            batch_length=batch_length,
+                                            train_length=train_length,
+                                            max_epoch=max_training_epoch,
+                                            learning_rate=learning_rate,
+                                            pass_threshold=reward_threshold,
+                                            model_path=model_path)
     
     def back_test(self):
         if len(self.portfolio) == 0 or self.asset_data is None:
             print("Init data first")
             return
-        self.model.back_test(asset_data=self.asset_data, c=FEE, test_length=TEST_LENGTH)
+        self.model.back_test(asset_data=self.asset_data, c=fee, test_length=test_length)
     
     def trade(self):
         print('=' * 100)
@@ -76,62 +88,48 @@ class Trader(object):
             return
         actions = self.model.trade(asset_data=self.asset_data)
         print('predict action for portfolio', list(zip(self.portfolio, actions)))
-        total = np.sum(actions)
-        if total > 0:
-            actions = np.clip(actions / total, 0, MAX_ASSET_PERCENT)
-        actions = sorted(zip(self.portfolio, actions), key=lambda x: x[1])
-        for asset, action in actions:
-            re_balance(action,
-                       symbol=asset + BASE_CURRENCY,
-                       asset=asset,
-                       portfolio=self.portfolio,
-                       base_currency=BASE_CURRENCY,
-                       order_type=ORDER_TYPE,
-                       price_discount=PRICE_DISCOUNT,
-                       amount_discount=AMOUNT_DISCOUNT,
-                       debug=DEBUG_MODE,
-                       wait_interval=ORDER_WAIT_INTERVAL,
-                       trace_order=TRACE_ORDER,
-                       max_order_waiting_time=MAX_ORDER_WAITING_TIME)
+        self.trader.re_balance(actions=actions)
         print(datetime.datetime.now())
 
-
+    
+    
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         print('Please input command')
         sys.exit(1)
     command = sys.argv[1]
-    trader = Trader()
-    trader.init_portfolio(portfolio_config=PORTFOLIO_CONFIG)
+    portfolio_manager = PortfolioManager()
+    portfolio_manager.init_assets(assets_config=portfolio_config)
     if command == 'trade':
-        last_trade_hour = None
-        trader.init_data(TRADE_BAR_COUNT)
-        trader.load_model()
+        last_trade_time = None
+        portfolio_manager.init_data(trade_bar_count)
+        portfolio_manager.load_model()
         print("Waiting to trade when triggered")
         while True:
-            if datetime.datetime.now().minute == TRADE_TRIGGER and last_trade_hour != datetime.datetime.now().hour:
+            current_time = str(datetime.datetime.now().hour) + '_' + str(datetime.datetime.now().minute)
+            if datetime.datetime.now().minute in trade_time and last_trade_time != current_time:
                 print("Start to trade on {0}".format(datetime.datetime.now()))
-                last_trade_hour = datetime.datetime.now().hour
+                last_trade_time = current_time
                 try:
-                    trader.init_data(TRADE_BAR_COUNT)
+                    portfolio_manager.init_data(trade_bar_count)
                 except Exception as e:
-                    trader.init_data(TRADE_BAR_COUNT)
-                trader.trade()
+                    portfolio_manager.init_data(trade_bar_count)
+                portfolio_manager.trade()
     elif command == 'trade_now':
         try:
-            trader.init_data(TRADE_BAR_COUNT)
+            portfolio_manager.init_data(trade_bar_count)
         except Exception:
-            trader.init_data(TRADE_BAR_COUNT)
-        trader.load_model()
-        trader.trade()
-        
+            portfolio_manager.init_data(trade_bar_count)
+        portfolio_manager.load_model()
+        portfolio_manager.trade()
+    
     elif command == 'build_model':
-        trader.init_data(TRAIN_BAR_COUNT)
-        trader.build_model()
+        portfolio_manager.init_data(train_bar_count)
+        portfolio_manager.build_model()
     elif command == 'backtest':
-        trader.init_data(TRAIN_BAR_COUNT)
-        trader.load_model()
-        trader.back_test()
+        portfolio_manager.init_data(train_bar_count)
+        portfolio_manager.load_model()
+        portfolio_manager.back_test()
     else:
         print('invalid command')
         # Donate XMR:   4AUY1FEpfGtYutRShAsmTMbVFmLoZdL92Gg6fQPYsN1P61mqrZpgnmsQKtYM8CkFpvDMJS6MuuKmncHhSpUtRyEqGcNUht2
