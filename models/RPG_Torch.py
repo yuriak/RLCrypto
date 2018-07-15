@@ -7,9 +7,9 @@ import numpy as np
 import os
 
 
-class PolicyNetwork(nn.Module):
+class Actor(nn.Module):
     def __init__(self, s_dim, a_dim, b_dim, rnn_layers=1, dp=0.2):
-        super(PolicyNetwork, self).__init__()
+        super(Actor, self).__init__()
         self.s_dim = s_dim
         self.a_dim = a_dim
         self.b_dim = b_dim
@@ -60,12 +60,12 @@ class RPG_Torch(Model):
         
         self.train_hidden = None
         self.trade_hidden = None
-        self.policy = PolicyNetwork(s_dim=self.s_dim, a_dim=self.a_dim, b_dim=self.b_dim, rnn_layers=rnn_layers)
-        self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
+        self.actor = Actor(s_dim=self.s_dim, a_dim=self.a_dim, b_dim=self.b_dim, rnn_layers=rnn_layers)
+        self.optimizer = optim.Adam(self.actor.parameters(), lr=learning_rate)
     
     def _trade(self, state, train=False):
         with torch.no_grad():
-            a, _, self.trade_hidden = self.policy(state[:, None, :], self.trade_hidden, train=False)
+            a, _, self.trade_hidden = self.actor(state[:, None, :], self.trade_hidden, train=False)
         if train:
             return torch.multinomial(a[:, 0, :], 1)
         else:
@@ -77,13 +77,13 @@ class RPG_Torch(Model):
         s_next = torch.stack(self.s_next_buffer).t()
         r = torch.stack(self.r_buffer).t()
         a = torch.stack(self.a_buffer).t()
-        a_hat, s_next_hat, self.train_hidden = self.policy(s, self.train_hidden, train=True)
+        a_hat, s_next_hat, self.train_hidden = self.actor(s, self.train_hidden, train=True)
         mse_loss = torch.nn.functional.mse_loss(s_next_hat, s_next)
         nll = -torch.log(a_hat.gather(2, a))
         pg_loss = (nll * r).mean()
         loss = mse_loss + pg_loss
         loss.backward()
-        for param in self.policy.parameters():
+        for param in self.actor.parameters():
             param.grad.data.clamp_(-1, 1)
         self.optimizer.step()
     
@@ -114,12 +114,12 @@ class RPG_Torch(Model):
             self.s_next_buffer.append(next_state)
     
     def load_model(self, model_path='./RPG_Torch'):
-        self.policy = torch.load(model_path + '/model.pkl')
+        self.actor = torch.load(model_path + '/model.pkl')
     
     def save_model(self, model_path='./RPG_Torch'):
         if not os.path.exists(model_path):
             os.mkdir(model_path)
-        torch.save(self.policy, model_path + '/model.pkl')
+        torch.save(self.actor, model_path + '/model.pkl')
     
     def train(self, asset_data, c, train_length, epoch=0):
         self.reset_model()
