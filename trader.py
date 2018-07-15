@@ -135,6 +135,7 @@ class Trader(object):
             except Exception:
                 info = order_info(order_id)
             if info is None or info['data'] is None:
+                print('trace order failed for {0} {1}'.format(order_direction[direction], asset))
                 return
             order_filled = (info['data']['state'] == 'filled')
             if (time.time() - start_time) > self.max_order_waiting_time:
