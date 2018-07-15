@@ -6,11 +6,11 @@
 	"RPG_TF": {
 	  "model_path": "./model_backup/RPG_TF"
 	},
-	"PG_Torch":{
-	  "model_path":"./model_backup/PG_Torch"
+	"PG_Torch": {
+	  "model_path": "./model_backup/PG_Torch"
 	},
-	"RPG_Torch":{
-	  "model_path":"./model_backup/RPG_Torch"
+	"RPG_Torch": {
+	  "model_path": "./model_backup/RPG_Torch"
 	}
   },
   "data": {
@@ -39,9 +39,10 @@
 	"order_type": "limit",
 	"price_discount": -5e-3,
 	"amount_discount": 0.09,
-	"order_wait_interval": 0,
 	"trace_order": true,
-	"trade_trigger": 55,
+	"trade_time": [
+	  55
+	],
 	"max_asset_percent": 0.4,
 	"max_order_waiting_time": 120
   },

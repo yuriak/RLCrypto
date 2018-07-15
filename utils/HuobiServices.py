@@ -78,6 +78,11 @@ def get_detail(symbol):
     return http_get_request(url, params)
 
 
+def get_tickers():
+    url = MARKET_URL + '/market/tickers'
+    return http_get_request(url, params='')
+
+
 # 获取  支持的交易对
 def get_symbols(long_polling=None):
     """

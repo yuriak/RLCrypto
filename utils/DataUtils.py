@@ -8,7 +8,6 @@ from collections import OrderedDict
 
 lmap = lambda func, it: list(map(lambda x: func(x), it))
 lfilter = lambda func, it: list(filter(lambda x: func(x), it))
-z_score = lambda x: (x - np.mean(x, axis=0)) / (np.std(x, axis=0) + 1e-5)
 
 
 def generate_tech_data(stock, open_name, close_name, high_name, low_name, max_time_window=10):
