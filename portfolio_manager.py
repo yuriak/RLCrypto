@@ -100,12 +100,13 @@ if __name__ == '__main__':
     portfolio_manager.init_assets(assets_config=config.portfolio_config)
     if command == 'trade':
         last_trade_time = None
+        portfolio_manager.init_trader()
         portfolio_manager.init_data(config.trade_bar_count)
         portfolio_manager.load_model()
         print("Waiting to trade when triggered")
         while True:
             current_time = str(datetime.datetime.now().hour) + '_' + str(datetime.datetime.now().minute)
-            if datetime.datetime.now().minute in config.trade_time and last_trade_time != current_time:
+            if (datetime.datetime.now().minute in config.trade_time) and (last_trade_time != current_time):
                 print("Start to trade on {0}".format(datetime.datetime.now()))
                 last_trade_time = current_time
                 try:
