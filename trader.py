@@ -84,8 +84,7 @@ class Trader(object):
     
     def _cancel_order(self, asset, debug=True):
         current_order_info = orders_list(symbol=(asset + self.base_currency), states='submitted')
-        print(current_order_info)
-        if 'data' not in current_order_info:
+        if current_order_info is None or 'data' not in current_order_info:
             return
         current_order_info = current_order_info['data']
         if len(current_order_info) > 0:
