@@ -1,9 +1,8 @@
 # -*- coding:utf-8 -*-
 import sys
-from utils.DataUtils import default_pre_process
 from utils.TradingUtils import *
 from utils.config import *
-from portfolio_manager import Trader
+from trader import *
 
 CONFIG_PATH = './config/config.json'
 if not os.path.exists(CONFIG_PATH):
@@ -19,7 +18,7 @@ class PortfolioManager(object):
     def __init__(self):
         self.portfolio = []
         self.asset_data = None
-        self.model = None
+        self.agent = None
         self.trader = None
     
     def init_assets(self, assets_config):
@@ -53,19 +52,19 @@ class PortfolioManager(object):
         if len(self.portfolio) == 0 or self.asset_data is None:
             print('Init data first')
             return
-        self.model = agent(s_dim=self.asset_data.shape[-1],
+        self.agent = agent(s_dim=self.asset_data.shape[-1],
                            b_dim=self.asset_data.shape[0],
                            a_dim=2,
                            learning_rate=learning_rate,
                            batch_length=batch_length,
                            normalize_length=normalize_length)
-        self.model.load_model(model_path=model_path)
+        self.agent.load_model(model_path=model_path)
     
     def build_model(self):
         if len(self.portfolio) == 0 or self.asset_data is None:
             print('Init data first')
             return
-        self.model = agent.create_new_model(asset_data=self.asset_data,
+        self.agent = agent.create_new_model(asset_data=self.asset_data,
                                             c=fee,
                                             normalize_length=normalize_length,
                                             batch_length=batch_length,
@@ -79,14 +78,14 @@ class PortfolioManager(object):
         if len(self.portfolio) == 0 or self.asset_data is None:
             print("Init data first")
             return
-        self.model.back_test(asset_data=self.asset_data, c=fee, test_length=test_length)
+        self.agent.back_test(asset_data=self.asset_data, c=fee, test_length=test_length)
     
     def trade(self):
         print('=' * 100)
-        if len(self.portfolio) == 0 or self.asset_data is None or self.model is None:
+        if len(self.portfolio) == 0 or self.asset_data is None or self.agent is None:
             print('Init data and model')
             return
-        actions = self.model.trade(asset_data=self.asset_data)
+        actions = self.agent.trade(asset_data=self.asset_data)
         print('predict action for portfolio', list(zip(self.portfolio, actions)))
         self.trader.re_balance(actions=actions)
         print(datetime.datetime.now())
