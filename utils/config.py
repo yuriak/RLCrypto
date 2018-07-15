@@ -2,32 +2,60 @@
 import importlib
 import json
 
-log_file = "./log/portfolio_log.csv"
-base_currency = 'btc'
-debug_mode = True
-portfolio_config = "./config/portfolio_config.json"
-model_type = 'RPG_Torch'
-model_path = './model_backup/RPG_Torch'
-account_file = "./config/account.json"
-order_type = 'limit'
-price_discount = 1e-3
-amount_discount = 0.05
-trace_order = True
-trade_time = [55]
-max_asset_percent = 0.4
-max_order_waiting_time = 120
-fee = 1e-5
-normalize_length = 10
-batch_length = 64
-learning_rate = 1e-3
-reward_threshold = 0.3
-max_training_epoch = 30
-train_length = 1500
-test_length = 400
-trade_bar_count = 200
-train_bar_count = 2000
-tick_interval = '60min'
-agent = getattr(importlib.import_module("models.{0}".format(model_type)), model_type)
+# log_file = "./log/portfolio_log.csv"
+# base_currency = 'btc'
+# debug_mode = True
+# portfolio_config = "./config/portfolio_config.json"
+# model_type = 'RPG_Torch'
+# model_path = './model_backup/RPG_Torch'
+# account_file = "./config/account.json"
+# order_type = 'limit'
+# price_discount = 1e-3
+# amount_discount = 0.05
+# trace_order = True
+# trade_time = [55]
+# max_asset_percent = 0.4
+# max_order_waiting_time = 120
+# fee = 1e-5
+# normalize_length = 10
+# batch_length = 64
+# learning_rate = 1e-3
+# reward_threshold = 0.3
+# max_training_epoch = 30
+# train_length = 1500
+# test_length = 400
+# trade_bar_count = 200
+# train_bar_count = 2000
+# tick_interval = '60min'
+# agent = getattr(importlib.import_module("models.{0}".format(model_type)), model_type)
+
+log_file = None
+base_currency = None
+debug_mode = None
+portfolio_config = None
+model_type = None
+model_path = None
+account_file = None
+order_type = None
+price_discount = None
+amount_discount = None
+trace_order = None
+trade_time = None
+max_asset_percent = None
+max_order_waiting_time = None
+fee = None
+normalize_length = None
+batch_length = None
+learning_rate = None
+reward_threshold = None
+max_training_epoch = None
+train_length = None
+test_length = None
+trade_bar_count = None
+train_bar_count = None
+tick_interval = None
+agent = None
+
 
 
 # 我可能是个傻子。。。非要这么写？就为了用IDE的自动提示方便？
