@@ -61,7 +61,7 @@ class Trader(object):
         # batch execute sell orders
         sell_threads = []
         for k, v in sell_candidates.items():
-            amount, price, direction = self._generate_order(asset=k, trade_amount=v, tickers=tickers)
+            amount, price, direction = self._generate_order(asset=k, trade_amount=v, tickers=tickers, use_discount=False)
             t = Thread(target=self._execute_order,
                        name='sell_' + k,
                        args=(k, amount, price, direction),
@@ -74,7 +74,7 @@ class Trader(object):
         # batch execute buy orders
         buy_threads = []
         for k, v in buy_candidates.items():
-            amount, price, direction = self._generate_order(asset=k, trade_amount=v, tickers=tickers)
+            amount, price, direction = self._generate_order(asset=k, trade_amount=v, tickers=tickers, use_discount=False)
             t = Thread(target=self._execute_order,
                        name='sell_' + k,
                        args=(k, amount, price, direction),
@@ -169,14 +169,14 @@ class Trader(object):
         print("order full filled for {0} {1}".format(order_direction[direction], asset))
         return
     
-    def _generate_order(self, asset, trade_amount, tickers):
+    def _generate_order(self, asset, trade_amount, tickers, use_discount=True):
         amount = (abs(trade_amount) * (1 - self.amount_discount))
         ap = self.asset_info['ap'][asset]
         amount = round(amount, ap) if ap > 0 else int(amount)
         direction = np.sign(trade_amount)
         
         pp = self.asset_info['pp'][asset]
-        price = tickers['close'][asset] * (1 - direction * self.price_discount)
+        price = tickers['close'][asset] * (1 - direction * self.price_discount * (int(use_discount)))
         price = round(price, pp) if pp > 0 else int(price)
         return amount, price, direction
     
