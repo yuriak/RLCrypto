@@ -138,18 +138,20 @@ class Trader(object):
                 return
             order_filled = (info['data']['state'] == 'filled')
             if (time.time() - start_time) > self.max_order_waiting_time:
+                print("*" * 25)
                 print("exceed pending time, use discount price for {0} {1}".format(order_direction[direction], symbol))
                 try:
                     cancel_order(order_id)
                 except Exception:
                     print('cancel order failed for {0} {1}'.format(order_direction[direction], symbol))
                     pass
-                discounted_price = round(discounted_price * (1 + direction * self.price_discount), self.portfolio['pp'][asset])
+                discounted_price = round(discounted_price * (1 + direction * self.price_discount), self.asset_info['pp'][asset])
                 order = send_order(symbol=symbol,
                                    source='api',
                                    amount=amount,
                                    _type=order_direction[direction] + '-' + self.order_type,
                                    price=discounted_price)
+                print("*" * 25)
                 print("send {0}-{1} order for {2}: "
                       "on price: {3} with amount: {4}".format(self.order_type,
                                                               order_direction[direction],
