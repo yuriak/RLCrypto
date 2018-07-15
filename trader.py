@@ -105,49 +105,59 @@ class Trader(object):
                                                       symbol,
                                                       price,
                                                       direction * amount))
-        if not debug:
-            order = send_order(symbol=symbol,
-                               source='api',
-                               amount=amount,
-                               _type=order_direction[direction] + '-' + self.order_type,
-                               price=price if self.order_type == 'limit' else 0)
-            print("order result for {0}:".format(symbol), order)
-            order_id = order['data']
-            if trace_order:
-                if order_id is not None:
-                    order_filled = False
-                    print("tracing order")
-                    start_time = time.time()
-                    discounted_price = price
-                    while not order_filled:
-                        try:
-                            time.sleep(10)
-                            info = order_info(order_id)
-                            if info['data'] is None:
-                                break
-                            order_filled = (info['data']['state'] == 'filled')
-                            if time.time() - start_time > self.max_order_waiting_time:
-                                print("exceed pending time, use discount price for{0}".format(asset + self.base_currency))
-                                cancel_order(order_id)
-                                discounted_price = round(discounted_price * (1 + direction * self.price_discount), self.portfolio[asset]['pp'])
-                                order = send_order(symbol=symbol,
-                                                   source='api',
-                                                   amount=amount, _type=order_direction[direction] + '-' + self.order_type,
-                                                   price=discounted_price)
-                                start_time = time.time()
-                                print(order)
-                                order_id = order['data']
-                                if order_id is None:
-                                    return
-                        except Exception as e:
-                            print(e)
-                    print("order full filled")
-                    return
-            else:
-                return
-        else:
+        if debug:
             print("debugging")
             return
+        order = send_order(symbol=symbol,
+                           source='api',
+                           amount=amount,
+                           _type=order_direction[direction] + '-' + self.order_type,
+                           price=price if self.order_type == 'limit' else 0)
+        print("order result for {0} {1}:".format(order_direction[direction], symbol), order)
+        order_id = order['data']
+        if order_id is None:
+            return
+        if not trace_order:
+            return
+        order_filled = False
+        print("tracing order for {0} {1}".format(order_direction[direction], symbol))
+        start_time = time.time()
+        discounted_price = price
+        while not order_filled:
+            time.sleep(10)
+            try:
+                info = order_info(order_id)
+            except Exception:
+                info = order_info(order_id)
+            if info is None or info['data'] is None:
+                return
+            order_filled = (info['data']['state'] == 'filled')
+            if (time.time() - start_time) > self.max_order_waiting_time:
+                print("exceed pending time, use discount price for {0} {1}".format(order_direction[direction], symbol))
+                try:
+                    cancel_order(order_id)
+                except Exception:
+                    print('cancel order failed for {0} {1}'.format(order_direction[direction], symbol))
+                    pass
+                discounted_price = round(discounted_price * (1 + direction * self.price_discount), self.portfolio[asset]['pp'])
+                order = send_order(symbol=symbol,
+                                   source='api',
+                                   amount=amount,
+                                   _type=order_direction[direction] + '-' + self.order_type,
+                                   price=discounted_price)
+                print("send {0}-{1} order for {2}: "
+                      "on price: {3} with amount: {4}".format(self.order_type,
+                                                              order_direction[direction],
+                                                              symbol,
+                                                              discounted_price,
+                                                              direction * amount))
+                start_time = time.time()
+                print("order result for {0} {1}:".format(order_direction[direction], symbol), order)
+                order_id = order['data']
+                if order_id is None:
+                    return
+        print("order full filled for {0}".format(asset + self.base_currency))
+        return
     
     def _generate_order(self, asset, trade_amount, tickers):
         amount = (abs(trade_amount) * (1 - self.amount_discount))
@@ -156,7 +166,7 @@ class Trader(object):
         direction = np.sign(trade_amount)
         
         pp = self.asset_info['pp'][asset]
-        price = tickers['close'][asset]
+        price = tickers['close'][asset] * (1 - direction * self.price_discount)
         price = round(price, pp) if pp > 0 else int(price)
         return amount, price, direction
     
