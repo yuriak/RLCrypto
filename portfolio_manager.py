@@ -118,6 +118,7 @@ if __name__ == '__main__':
             portfolio_manager.init_data(trade_bar_count)
         except Exception:
             portfolio_manager.init_data(trade_bar_count)
+        portfolio_manager.init_trader()
         portfolio_manager.load_model()
         portfolio_manager.trade()
     
