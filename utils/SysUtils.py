@@ -17,8 +17,8 @@ import urllib.request
 import requests
 
 # 此处填写APIKEY
-ACCESS_KEY=''
-SECRET_KEY=''
+ACCESS_KEY = ''
+SECRET_KEY = ''
 
 
 def init_account(account_file_path):
@@ -29,6 +29,7 @@ def init_account(account_file_path):
             account_info = json.loads(f.read())
             ACCESS_KEY = account_info['ACCESS_KEY']
             SECRET_KEY = account_info['SECRET_KEY']
+
 
 # API 请求地址
 MARKET_URL = "https://api.huobi.pro"
@@ -50,7 +51,7 @@ def http_get_request(url, params, add_to_headers=None):
     postdata = urllib.parse.urlencode(params)
     response = requests.get(url, postdata, headers=headers, timeout=5)
     try:
-
+        
         if response.status_code == 200:
             return response.json()
         else:
@@ -70,7 +71,7 @@ def http_post_request(url, params, add_to_headers=None):
     postdata = json.dumps(params)
     response = requests.post(url, postdata, headers=headers, timeout=10)
     try:
-
+        
         if response.status_code == 200:
             return response.json()
         else:
@@ -87,12 +88,12 @@ def api_key_get(params, request_path):
                    'SignatureMethod': 'HmacSHA256',
                    'SignatureVersion': '2',
                    'Timestamp': timestamp})
-
+    
     host_url = TRADE_URL
     host_name = urllib.parse.urlparse(host_url).hostname
     host_name = host_name.lower()
     params['Signature'] = createSign(params, method, host_name, request_path, SECRET_KEY)
-
+    
     url = host_url + request_path
     return http_get_request(url, params)
 
@@ -104,7 +105,7 @@ def api_key_post(params, request_path):
                       'SignatureMethod': 'HmacSHA256',
                       'SignatureVersion': '2',
                       'Timestamp': timestamp}
-
+    
     host_url = TRADE_URL
     host_name = urllib.parse.urlparse(host_url).hostname
     host_name = host_name.lower()
@@ -120,7 +121,7 @@ def createSign(pParams, method, host_url, request_path, secret_key):
     payload = '\n'.join(payload)
     payload = payload.encode(encoding='UTF8')
     secret_key = secret_key.encode(encoding='UTF8')
-
+    
     digest = hmac.new(secret_key, payload, digestmod=hashlib.sha256).digest()
     signature = base64.b64encode(digest)
     signature = signature.decode()
