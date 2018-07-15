@@ -57,11 +57,10 @@ tick_interval = None
 agent = None
 
 
-
 # 我可能是个傻子。。。非要这么写？就为了用IDE的自动提示方便？
 # 我可能确实是个傻子。。。
 def init_config(config_path):
-    with open(config_path, 'r') as f:
+    with open(config_path, 'r+') as f:
         global log_file
         global base_currency
         global debug_mode

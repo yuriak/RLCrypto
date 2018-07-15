@@ -1,8 +1,8 @@
 # -*- coding:utf-8 -*-
 import sys
 from utils.TradingUtils import *
-from utils.config import *
 from trader import *
+from utils.config import *
 
 CONFIG_PATH = './config/config.json'
 if not os.path.exists(CONFIG_PATH):
