@@ -44,6 +44,7 @@ class Trader(object):
         for a in self.assets:
             t = Thread(target=self._cancel_order, name='cancel_' + a, args=(a,), kwargs={'debug': self.debug})
             cancel_threads.append(t)
+            time.sleep(1)
             t.start()
         [t.join() for t in cancel_threads]
         
@@ -66,6 +67,7 @@ class Trader(object):
                        args=(k, amount, price, direction),
                        kwargs={'trace_order': self.trace_order, 'debug': self.debug})
             sell_threads.append(t)
+            time.sleep(1)
             t.start()
         [t.join() for t in sell_threads]
         
@@ -78,6 +80,7 @@ class Trader(object):
                        args=(k, amount, price, direction),
                        kwargs={'trace_order': self.trace_order, 'debug': self.debug})
             buy_threads.append(t)
+            time.sleep(1)
             t.start()
         [t.join() for t in buy_threads]
         return
@@ -114,6 +117,8 @@ class Trader(object):
                            _type=order_direction[direction] + '-' + self.order_type,
                            price=price if self.order_type == 'limit' else 0)
         print("order result for {0} {1}:".format(order_direction[direction], symbol), order)
+        if order is None:
+            return
         order_id = order['data']
         if order_id is None:
             return
@@ -139,7 +144,7 @@ class Trader(object):
                 except Exception:
                     print('cancel order failed for {0} {1}'.format(order_direction[direction], symbol))
                     pass
-                discounted_price = round(discounted_price * (1 + direction * self.price_discount), self.portfolio[asset]['pp'])
+                discounted_price = round(discounted_price * (1 + direction * self.price_discount), self.portfolio['pp'][asset])
                 order = send_order(symbol=symbol,
                                    source='api',
                                    amount=amount,
@@ -153,10 +158,12 @@ class Trader(object):
                                                               direction * amount))
                 start_time = time.time()
                 print("order result for {0} {1}:".format(order_direction[direction], symbol), order)
+                if order is None:
+                    return
                 order_id = order['data']
                 if order_id is None:
                     return
-        print("order full filled for {0}".format(asset + self.base_currency))
+        print("order full filled for {0} {1}".format(order_direction[direction], asset))
         return
     
     def _generate_order(self, asset, trade_amount, tickers):
