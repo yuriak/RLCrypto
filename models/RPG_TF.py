@@ -151,9 +151,9 @@ class RPG_TF(Model):
                 train_reward = []
                 previous_action = np.zeros(asset_data.shape[0])
                 for t in range(model.normalize_length, train_length):
-                    data = asset_data[:, t - model.normalize_length:t, :].values
+                    data = asset_data.iloc[:, t - model.normalize_length:t, :].values
                     state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
-                    data = asset_data[:, t - model.normalize_length + 1:t + 1, :].values
+                    data = asset_data.iloc[:, t - model.normalize_length + 1:t + 1, :].values
                     next_state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
                     model.save_current_state(s=state)
                     action_ = model._trade(train=True, kp=1.0, prob=False)
@@ -169,7 +169,7 @@ class RPG_TF(Model):
                 train_mean_r.append(np.mean(train_reward))
                 previous_action = np.zeros(asset_data.shape[0])
                 for t in range(train_length, asset_data.shape[1]):
-                    data = asset_data[:, t - model.normalize_length:t, :].values
+                    data = asset_data.iloc[:, t - model.normalize_length:t, :].values
                     state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
                     model.save_current_state(s=state)
                     action_ = model._trade(train=False, kp=1.0, prob=False)
@@ -195,7 +195,7 @@ class RPG_TF(Model):
         test_reward = []
         test_actions = []
         for t in range(asset_data.shape[1] - test_length, asset_data.shape[1]):
-            data = asset_data[:, t - self.normalize_length:t, :].values
+            data = asset_data.iloc[:, t - self.normalize_length:t, :].values
             state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
             self.save_current_state(s=state)
             action_ = self._trade(train=False, kp=1.0, prob=False)
@@ -212,7 +212,7 @@ class RPG_TF(Model):
     def trade(self, asset_data):
         self.restore_buffer()
         for t in range(asset_data.shape[1] - self.batch_size, asset_data.shape[1]):
-            data = asset_data[:, t - self.normalize_length + 1:t + 1, :].values
+            data = asset_data.iloc[:, t - self.normalize_length + 1:t + 1, :].values
             state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
             self.save_current_state(s=state)
         action_ = self._trade(train=False, kp=1.0, prob=False)[:, 0]

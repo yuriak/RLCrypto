@@ -132,7 +132,7 @@ class PG_TF(Model):
                 train_reward = []
                 previous_action = np.zeros(asset_data.shape[0])
                 for t in range(model.normalize_length, train_length):
-                    data = asset_data[:, t - model.normalize_length:t, :].values
+                    data = asset_data.iloc[:, t - model.normalize_length:t, :].values
                     state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
                     action = model._trade(state, train=True, prob=False, kp=1.0)
                     r = asset_data[:, :, 'diff'].iloc[t].values * action[:, 0] - c * np.abs(previous_action - action[:, 0])
@@ -147,7 +147,7 @@ class PG_TF(Model):
                 train_mean_r.append(np.mean(train_reward))
                 previous_action = np.zeros(asset_data.shape[0])
                 for t in range(train_length, asset_data.shape[1]):
-                    data = asset_data[:, t - model.normalize_length:t, :].values
+                    data = asset_data.iloc[:, t - model.normalize_length:t, :].values
                     state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
                     action = model._trade(state, train=True, prob=False, kp=1.0)
                     r = asset_data[:, :, 'diff'].iloc[t].values * action[:, 0] - c * np.abs(previous_action - action[:, 0])

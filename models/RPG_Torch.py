@@ -127,7 +127,7 @@ class RPG_Torch(Model):
         train_reward = []
         train_actions = []
         for t in range(self.normalize_length, train_length):
-            data = asset_data[:, t - self.normalize_length:t, :].values
+            data = asset_data.iloc[:, t - self.normalize_length:t, :].values
             state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
             state = torch.tensor(state)
             next_state = asset_data[:, :, 'diff'].iloc[t].values
@@ -151,7 +151,7 @@ class RPG_Torch(Model):
         test_reward = []
         test_actions = []
         for t in range(asset_data.shape[1] - test_length, asset_data.shape[1]):
-            data = asset_data[:, t - self.normalize_length:t, :].values
+            data = asset_data.iloc[:, t - self.normalize_length:t, :].values
             state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
             state = torch.tensor(state)
             action = self._trade(state=state, train=False)
@@ -169,13 +169,13 @@ class RPG_Torch(Model):
             self.reset_model()
             action_np = np.zeros(asset_data.shape[0])
             for t in range(asset_data.shape[1] - self.batch_length, asset_data.shape[1]):
-                data = asset_data[:, t - self.normalize_length + 1:t + 1, :].values
+                data = asset_data.iloc[:, t - self.normalize_length + 1:t + 1, :].values
                 state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
                 state = torch.tensor(state)
                 action = self._trade(state=state, train=False)
                 action_np = action.numpy().flatten()
         else:
-            data = asset_data[:, -self.normalize_length:, :].values
+            data = asset_data.iloc[:, -self.normalize_length:, :].values
             state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
             state = torch.tensor(state)
             action = self._trade(state=state, train=False)
