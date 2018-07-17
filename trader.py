@@ -128,6 +128,7 @@ class Trader(object):
         print("tracing order for {0} {1}".format(order_direction[direction], symbol))
         start_time = time.time()
         discounted_price = price
+        
         while not order_filled:
             time.sleep(10)
             try:
@@ -146,12 +147,13 @@ class Trader(object):
                 except Exception:
                     print('cancel order failed for {0} {1}'.format(order_direction[direction], symbol))
                     pass
-                discounted_price = round(discounted_price * (1 + direction * self.price_discount), self.asset_info['pp'][asset])
+                discounted_price = discounted_price * (1 + direction * self.price_discount)
+                trade_price = round(discounted_price, self.asset_info['pp'][asset])
                 order = send_order(symbol=symbol,
                                    source='api',
                                    amount=amount,
                                    _type=order_direction[direction] + '-' + self.order_type,
-                                   price=discounted_price)
+                                   price=trade_price)
                 print("*" * 25)
                 print("send {0}-{1} order for {2}: "
                       "on price: {3} with amount: {4}".format(self.order_type,
