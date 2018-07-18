@@ -128,7 +128,6 @@ class Trader(object):
         print("tracing order for {0} {1}".format(order_direction[direction], symbol))
         start_time = time.time()
         discounted_price = price
-        
         while not order_filled:
             time.sleep(10)
             try:
