@@ -186,4 +186,4 @@ class PG_TF(Model):
         data = asset_data[:, -self.normalize_length:, :].values
         state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
         action_ = self._trade(state, train=False, prob=False, kp=1.0)[:, 0]
-        return action_
+        return action_ / (np.sum(action_) + 1e-10)

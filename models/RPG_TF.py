@@ -216,4 +216,4 @@ class RPG_TF(Model):
             state = ((data - np.mean(data, axis=1, keepdims=True)) / (np.std(data, axis=1, keepdims=True) + 1e-5))[:, -1, :]
             self.save_current_state(s=state)
         action_ = self._trade(train=False, kp=1.0, prob=False)[:, 0]
-        return action_
+        return action_/(np.sum(action_)+1e-10)

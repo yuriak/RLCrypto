@@ -29,10 +29,10 @@ class Actor(nn.Module):
         state, h = self.gru(state, hidden)
         if train:
             state = self.dropout(state)
-        action = self.relu(self.fc_policy_1(state))
-        action = self.relu(self.fc_policy_2(action))
+        state = self.relu(self.fc_policy_1(state))
+        state = self.relu(self.fc_policy_2(state))
         cash = self.sigmoid(self.fc_cash_out(state))
-        action = self.sigmoid(self.fc_policy_out(action)).squeeze(-1).t()
+        action = self.sigmoid(self.fc_policy_out(state)).squeeze(-1).t()
         cash = cash.mean(dim=0)
         action = torch.cat(((1 - cash) * action, cash), dim=-1)
         action = action / (action.sum(dim=-1, keepdim=True) + 1e-10)
@@ -40,20 +40,18 @@ class Actor(nn.Module):
 
 
 class DRL_Torch(Model):
-    def __init__(self, s_dim, a_dim, b_dim, batch_length=64, learning_rate=1e-3, rnn_layers=1, normalize_length=10):
+    def __init__(self, s_dim, b_dim, batch_length=64, learning_rate=1e-3, rnn_layers=1, normalize_length=10):
         self.s_dim = s_dim
-        self.a_dim = a_dim
         self.b_dim = b_dim
         self.batch_length = batch_length
         self.normalize_length = normalize_length
         self.pointer = 0
         self.s_buffer = []
-        self.a_buffer = []
         self.d_buffer = []
         
         self.train_hidden = None
         self.trade_hidden = None
-        self.actor = Actor(s_dim=self.s_dim, a_dim=self.a_dim, b_dim=self.b_dim, rnn_layers=rnn_layers)
+        self.actor = Actor(s_dim=self.s_dim, b_dim=self.b_dim, rnn_layers=rnn_layers)
         self.optimizer = optim.Adam(self.actor.parameters(), lr=learning_rate)
     
     def _trade(self, state, train=False):
@@ -64,7 +62,7 @@ class DRL_Torch(Model):
     def _train(self):
         self.optimizer.zero_grad()
         s = torch.stack(self.s_buffer).t()
-        d = torch.stack(self.d_buffer).t()
+        d = torch.stack(self.d_buffer)
         a_hat, self.train_hidden = self.actor(s, self.train_hidden, train=True)
         reward = -(a_hat[:, :-1] * d).mean()
         reward.backward()
@@ -100,7 +98,7 @@ class DRL_Torch(Model):
     
     def train(self, asset_data, c, train_length, epoch=0):
         self.reset_model()
-        previous_action = np.zeros(asset_data.shape[0] + 1)
+        previous_action = np.zeros(asset_data.shape[0])
         train_reward = []
         train_actions = []
         for t in range(self.normalize_length, train_length):
@@ -109,15 +107,15 @@ class DRL_Torch(Model):
             state = torch.tensor(state)
             action = self._trade(state, train=True)
             action_np = action.numpy().flatten()
-            r = asset_data[:, :, 'diff'].iloc[t].values * action_np - c * np.abs(previous_action - action_np)
+            r = asset_data[:, :, 'diff'].iloc[t].values * action_np[:-1] - c * np.abs(previous_action - action_np[:-1])
             self.save_transition(state=state, reward=asset_data[:, :, 'diff'].iloc[t].values)
             train_reward.append(r)
             train_actions.append(action_np)
-            previous_action = action_np
+            previous_action = action_np[:-1]
             if t % self.batch_length == 0:
                 self._train()
         self.reset_model()
-        print(epoch, 'train_reward', np.sum(np.mean(train_reward, axis=1)), np.mean(train_reward))
+        print(epoch, 'train_reward', np.sum(np.sum(train_reward, axis=1)), np.mean(train_reward))
         return train_reward, train_actions
     
     def back_test(self, asset_data, c, test_length, epoch=0):
@@ -131,12 +129,12 @@ class DRL_Torch(Model):
             state = torch.tensor(state)
             action = self._trade(state=state, train=False)
             action_np = action.numpy().flatten()
-            r = asset_data[:, :, 'diff'].iloc[t].values * action_np - c * np.abs(previous_action - action_np)
+            r = asset_data[:, :, 'diff'].iloc[t].values * action_np[:-1] - c * np.abs(previous_action - action_np[:-1])
             test_reward.append(r)
             test_actions.append(action_np)
-            previous_action = action_np
+            previous_action = action_np[:-1]
         self.reset_model()
-        print(epoch, 'backtest reward', np.sum(np.mean(test_reward, axis=1)), np.mean(test_reward))
+        print(epoch, 'backtest reward', np.sum(np.sum(test_reward, axis=1)), np.mean(test_reward))
         return test_reward, test_actions
     
     def trade(self, asset_data):
@@ -155,7 +153,7 @@ class DRL_Torch(Model):
             state = torch.tensor(state)
             action = self._trade(state=state, train=False)
             action_np = action.numpy().flatten()
-        return action_np
+        return action_np[:-1]
     
     @staticmethod
     def create_new_model(asset_data,

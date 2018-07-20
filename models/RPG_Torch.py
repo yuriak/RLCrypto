@@ -180,7 +180,7 @@ class RPG_Torch(Model):
             state = torch.tensor(state)
             action = self._trade(state=state, train=False)
             action_np = action.numpy().flatten()
-        return action_np
+        return action_np/(np.sum(action_np)+1e-10)
     
     @staticmethod
     def create_new_model(asset_data,

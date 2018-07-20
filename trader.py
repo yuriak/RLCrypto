@@ -49,8 +49,8 @@ class Trader(object):
         [t.join() for t in cancel_threads]
         
         tickers = self.init_portfolio()
-        target_weight = pd.Series(dict(zip(self.assets, actions)))
-        target_weight = (target_weight / target_weight.sum()).fillna(0).clip(0, self.max_asset_persent)
+        target_weight = pd.Series(dict(zip(self.assets, actions))).clip(0, self.max_asset_persent)
+        # target_weight = (target_weight / target_weight.sum()).fillna(0).clip(0, self.max_asset_persent)
         current_weight = (self.portfolio['value'] / self.portfolio['value'].sum())[self.assets]
         trade_weight = target_weight - current_weight
         trade_value = trade_weight * self.portfolio['value'].sum()

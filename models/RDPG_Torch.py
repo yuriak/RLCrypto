@@ -260,7 +260,7 @@ class RDPG_Torch(Model):
             state = torch.tensor(state)
             action = self._trade(state=state, train=False)
             action_np = action.numpy().flatten()
-        return action_np
+        return action_np / (np.sum(action_np) + 1e-10)
     
     @staticmethod
     def create_new_model(asset_data, c, normalize_length, batch_length, train_length, max_epoch, learning_rate, pass_threshold, model_path):
