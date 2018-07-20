@@ -11,6 +11,9 @@
 	},
 	"RPG_Torch": {
 	  "model_path": "./model_backup/RPG_Torch"
+	},
+	"DRL_Torch": {
+	  "model_path": "./model_backup/DRL_Torch"
 	}
   },
   "data": {
@@ -34,7 +37,7 @@
 	"base_currency": "btc",
 	"debug_mode": true,
 	"portfolio_config": "./config/portfolio_config.json",
-	"model_type": "RPG_Torch",
+	"model_type": "DRL_Torch",
 	"account_file": "./config/account.json",
 	"order_type": "limit",
 	"price_discount": -5e-3,

@@ -88,10 +88,10 @@ class DRL_Torch(Model):
             self.s_buffer.append(state)
             self.d_buffer.append(torch.tensor(reward, dtype=torch.float32))
     
-    def load_model(self, model_path='./RPG_Torch'):
+    def load_model(self, model_path='./DRL_Torch'):
         self.actor = torch.load(model_path + '/model.pkl')
     
-    def save_model(self, model_path='./RPG_Torch'):
+    def save_model(self, model_path='./DRL_Torch'):
         if not os.path.exists(model_path):
             os.mkdir(model_path)
         torch.save(self.actor, model_path + '/model.pkl')
