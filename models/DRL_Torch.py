@@ -40,7 +40,7 @@ class Actor(nn.Module):
 
 
 class DRL_Torch(Model):
-    def __init__(self, s_dim, b_dim, batch_length=64, learning_rate=1e-3, rnn_layers=1, normalize_length=10):
+    def __init__(self, s_dim, b_dim, a_dim=1, batch_length=64, learning_rate=1e-3, rnn_layers=1, normalize_length=10):
         self.s_dim = s_dim
         self.b_dim = b_dim
         self.batch_length = batch_length
