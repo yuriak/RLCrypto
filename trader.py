@@ -50,7 +50,6 @@ class Trader(object):
         
         tickers = self.init_portfolio()
         target_weight = pd.Series(dict(zip(self.assets, actions))).clip(0, self.max_asset_persent)
-        # target_weight = (target_weight / target_weight.sum()).fillna(0).clip(0, self.max_asset_persent)
         current_weight = (self.portfolio['value'] / self.portfolio['value'].sum())[self.assets]
         trade_weight = target_weight - current_weight
         trade_value = trade_weight * self.portfolio['value'].sum()
@@ -58,10 +57,11 @@ class Trader(object):
         sell_candidates = OrderedDict(trade_amount[trade_amount < 0])
         buy_candidates = OrderedDict(trade_amount[trade_amount > 0])
         
+        tickers = self._get_tickers()
         # batch execute sell orders
         sell_threads = []
         for k, v in sell_candidates.items():
-            amount, price, direction = self._generate_order(asset=k, trade_amount=v, tickers=tickers, use_discount=False)
+            amount, price, direction = self._generate_order(asset=k, trade_amount=v, tickers=tickers, use_inverse_discount=True)
             t = Thread(target=self._execute_order,
                        name='sell_' + k,
                        args=(k, amount, price, direction),
@@ -71,10 +71,11 @@ class Trader(object):
             t.start()
         [t.join() for t in sell_threads]
         
+        tickers = self._get_tickers()
         # batch execute buy orders
         buy_threads = []
         for k, v in buy_candidates.items():
-            amount, price, direction = self._generate_order(asset=k, trade_amount=v, tickers=tickers, use_discount=False)
+            amount, price, direction = self._generate_order(asset=k, trade_amount=v, tickers=tickers, use_inverse_discount=False)
             t = Thread(target=self._execute_order,
                        name='sell_' + k,
                        args=(k, amount, price, direction),
@@ -170,14 +171,14 @@ class Trader(object):
         print("order full filled for {0} {1}".format(order_direction[direction], asset))
         return
     
-    def _generate_order(self, asset, trade_amount, tickers, use_discount=True):
+    def _generate_order(self, asset, trade_amount, tickers, use_inverse_discount=True):
         amount = (abs(trade_amount) * (1 - self.amount_discount))
         ap = self.asset_info['ap'][asset]
         amount = round(amount, ap) if ap > 0 else int(amount)
         direction = np.sign(trade_amount)
         
         pp = self.asset_info['pp'][asset]
-        price = tickers['close'][asset] * (1 - direction * self.price_discount * (int(use_discount)))
+        price = tickers['close'][asset] * (1 + direction * self.price_discount * (int(use_inverse_discount)))
         price = round(price, pp) if pp > 0 else int(price)
         return amount, price, direction
     
