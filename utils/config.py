@@ -56,6 +56,10 @@ train_bar_count = None
 tick_interval = None
 agent = None
 
+risk_asset_number = 1
+risk_free_asset_number = 2
+portfolio_selection_tick_interval = '5min'
+portfolio_selection_bar_count = 500
 
 # 我可能是个傻子。。。非要这么写？就为了用IDE的自动提示方便？
 # 我可能确实是个傻子。。。

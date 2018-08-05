@@ -89,6 +89,35 @@ class PortfolioManager(object):
         print('predict action for portfolio', list(zip(self.portfolio, actions)))
         self.trader.re_balance(actions=actions)
         print(datetime.datetime.now())
+    
+    def optimize_portfolio(self, method='CAPM', risky_number=config.risk_asset_number, risk_free_number=config.risk_free_asset_number):
+        symbols = lmap(lambda x: x['base-currency'], lfilter(lambda x: x['symbol-partition'] == 'innovation' and x['quote-currency'] == BASE_CURRENCY, get_symbols()['data']))
+        print('fetching data')
+        data = klines(symbols, interval=config.portfolio_selection_tick_interval, count=config.portfolio_selection_bar_count)
+        print('building data')
+        data = OrderedDict(data)
+        data = pd.Panel(data)
+        data = data.dropna(axis=1)
+        data.to_pickle('all_assets')
+        market_index = data[:, :, 'diff'].mean(axis=1)
+        if method == 'CAPM':
+            print('applying CAPM')
+            capm = pd.DataFrame(lmap(lambda x: linreg(x=market_index.values, y=data[x, :, 'diff'].values), data.items), index=data.items, columns=['alpha', 'beta'])
+            high_risk = capm[(capm['alpha'] > 0) & (capm['beta'] > 1)].sort_values('alpha')
+            low_risk = capm[(capm['alpha'] > 0) & (capm['beta'] < 1)].sort_values('alpha')
+            print(len(high_risk), 'risky candidates')
+            print(len(low_risk), 'risk-free candidates')
+            candidate = []
+            if risky_number > 0:
+                candidate.extend(list(high_risk[-risky_number:].index))
+            if risk_free_number > 0:
+                candidate.extend(list(low_risk[-risk_free_number:].index))
+            print(len(candidate))
+            print(candidate)
+            return candidate
+        else:
+            # not implemented
+            return []
 
 
 if __name__ == '__main__':
@@ -130,6 +159,8 @@ if __name__ == '__main__':
         portfolio_manager.init_data(config.train_bar_count)
         portfolio_manager.load_model()
         portfolio_manager.back_test()
+    elif command == 'security_selection':
+        raise NotImplementedError()
     else:
         print('invalid command')
         # Donate XMR:   4AUY1FEpfGtYutRShAsmTMbVFmLoZdL92Gg6fQPYsN1P61mqrZpgnmsQKtYM8CkFpvDMJS6MuuKmncHhSpUtRyEqGcNUht2

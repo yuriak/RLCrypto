@@ -131,6 +131,8 @@ If all things are ready
 ```bash
 python portfolio_manager.py trade
 ```
+Or you can use the shell ```trade.sh```
+
 6. Check the system periodically
 
 ## Risk Disclaimer (for Live-trading)
@@ -140,5 +142,6 @@ The volumes of many cryptocurrency markets are still low. Market impact and slip
 
 ## TODO
 - Use the information of order book when managing orders
+- Implement a security selection model based on maybe, fundamental data
 - Maybe More
 
