@@ -1,8 +1,8 @@
 # RLCrypto
 
 ## Introduction
-The trading framework for [Huobi Exchange](https://www.huobi.pro/)
-Research project based on [RLQuant](https://github.com/yuriak/RLQuant) & [DLQuant](https://github.com/yuriak/DLQuant)
+The trading framework for [Huobi Exchange](https://www.huobi.pro/)  
+The Application of my research projects [RLQuant](https://github.com/yuriak/RLQuant) & [DLQuant](https://github.com/yuriak/DLQuant)
 
 ## Features
 - Can be used to trade a portfolio
