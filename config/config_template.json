@@ -40,7 +40,7 @@
 	"model_type": "DRL_Torch",
 	"account_file": "./config/account.json",
 	"order_type": "limit",
-	"price_discount": -5e-3,
+	"price_discount": 5e-3,
 	"amount_discount": 0.09,
 	"trace_order": true,
 	"trade_time": [

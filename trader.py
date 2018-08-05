@@ -178,7 +178,7 @@ class Trader(object):
         direction = np.sign(trade_amount)
         
         pp = self.asset_info['pp'][asset]
-        price = tickers['close'][asset] * (1 + direction * self.price_discount * (int(use_inverse_discount)))
+        price = tickers['close'][asset] * (1 - direction * self.price_discount * (int(use_inverse_discount)))
         price = round(price, pp) if pp > 0 else int(price)
         return amount, price, direction
     
