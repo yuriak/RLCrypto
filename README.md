@@ -99,6 +99,40 @@ The interpretation of config file:
 }
 ```
 
+To start your auto-trader:
+1. Create a config file and modify it with your own parameters
+```bash
+copy ./config/config_template.json ./config/config.json
+```
+2. Create your account file with your access key and secret key
+```bash
+echo "{"ACCESS_KEY": "your access key","SECRET_KEY": "your secret key"}" >> ./config/account.json
+```
+3. Create your portfolio file with the asset you want to trade 
+```bash
+echo "["bat","soc", "wicc","edu"]" >> ./config/portfolio.json
+```
+4. Build your model
+```bash
+python3 portfolio_manager.py build_model
+```
+When it passes the backtest with the target return rate you set, it will automatically save the model parameters, then, you can use it to do live trading.
+
+5. Live-Trading!!!
+
+If you want to test if the system works correctly, you can choose to let it trade for once. 
+```bash
+python portfolio_manager.py trade_now
+```
+If all things are ready
+- Set the ```debug_mode``` to ```false``` in your config file
+- Make sure you have confidence in the market and agents  
+- Prepare to launch you AI trader
+```bash
+python portfolio_manager.py trade
+```
+6. Check the system periodically
+
 ## Risk Disclaimer (for Live-trading)
 There is always risk of loss in trading. __All trading strategies are used at your own risk__  
 
