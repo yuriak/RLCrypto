@@ -99,7 +99,7 @@ The interpretation of config file:
 }
 ```
 
-To start your auto-trader:
+To launch your AI trader:
 1. Create a config file and modify it with your own parameters
 ```bash
 copy ./config/config_template.json ./config/config.json
