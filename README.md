@@ -102,7 +102,7 @@ The interpretation of config file:
 To launch your AI trader:
 1. Create a config file and modify it with your own parameters
 ```bash
-copy ./config/config_template.json ./config/config.json
+cp ./config/config_template.json ./config/config.json
 ```
 2. Create your account file with your access key and secret key
 ```bash
